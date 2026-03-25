@@ -1,0 +1,43 @@
+[project]
+name = "cosmos"
+version = "0.1.0"
+description = "A framework for encapsulating Great Expectations within data pipelines, providing reusable validation layers, expectation suite management, and seamless pipeline integration."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "great-expectations>=1.15.1",
+    "pandas==3.0.1",
+    "pydantic==2.12.5",
+    "python-dotenv>=1.2.2",
+]
+
+[dependency-groups]
+dev = [
+    "faker>=40.11.1",
+    "pendulum>=3.2.0",
+    "pre-commit>=4.5.1",
+    "ruff>=0.15.7",
+]
+docs = [
+    "mkdocs>=1.6.1",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors – PEP 8 style errors
+    "F",   # pyflakes – unused imports, undefined names
+    "W",   # pycodestyle warnings – trailing whitespace, blank lines
+    "I",   # isort – import ordering
+    "N",   # pep8-naming – naming conventions (snake_case, PascalCase)
+    "UP",  # pyupgrade – modernize Python syntax
+    "B",   # flake8-bugbear – likely bugs and design issues
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
