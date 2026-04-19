@@ -16,6 +16,7 @@ dev = [
     "faker>=40.11.1",
     "pendulum>=3.2.0",
     "prek>=0.3.8",
+    "pyyaml==6.0.2",
     "ruff>=0.15.7",
 ]
 docs = [
@@ -37,7 +38,7 @@ select = [
     "B",   # flake8-bugbear – likely bugs and design issues
     "ANN", # flake8-annotations – missing type hints
 ]
-ignore = []
+ignore = ["UP015"]
 
 [tool.ruff.format]
 quote-style = "double"
