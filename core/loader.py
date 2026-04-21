@@ -24,11 +24,13 @@ class YamlLoader(BaseModel):
             Path: The validated file path.
 
         Raises:
-            ValueError: If the file path does not exist or is not a file.
+            FileNotFoundError: If the file path does not exist or is not a file.
         """
         path_obj = Path(value) if isinstance(value, str) else value
         if not path_obj.is_file():
-            raise ValueError(f"The path '{path_obj}' does not exist or is not a file.")
+            raise FileNotFoundError(
+                f"The path '{path_obj}' does not exist or is not a file."
+            )
         return path_obj
 
     @field_validator("file_path")
@@ -47,7 +49,7 @@ class YamlLoader(BaseModel):
         """
         if value.suffix not in {".yaml", ".yml"}:
             raise ValueError(
-                f"The provided path '{value}' does not have a valid YAML extension."
+                f"The provided file path '{value}' does not have a valid YAML extension."
             )
         return value
 
