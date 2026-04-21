@@ -1,0 +1,23 @@
+engine: pandas
+source:
+  type: local | aws | gcp | azure
+  file_format: csv
+  file_path: path/to/file.csv
+  options:
+    key: value
+
+gx:
+  datasource_name: pass
+  data_asset_name: pass
+  batch_definition_name: pass
+  expectation_suite_name: pass
+  checkpoint_name: pass
+  expectation_suite:
+    name: pass
+    expectations:
+      - expectation_type: expect_column_values_to_not_be_null
+        kwargs:
+          column: id
+      - expectation_type: expect_column_values_to_be_unique
+        kwargs:
+          column: id
