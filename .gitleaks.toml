@@ -6,3 +6,6 @@ paths = [
     '''tests/.*''',
     '''.*\.mock$'''
 ]
+
+[extend]
+useDefault = true
