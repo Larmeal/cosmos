@@ -5,7 +5,17 @@ source:
   file_path: path/to/file.csv
   options:
     key: value
-
+destination:
+  type: local | aws | gcp | azure
+  file_format: csv
+  file_path: path/to/file.csv
+  on_failure_action:
+    type: local | aws | gcp | azure
+    action: metadata_only | move_file | copy_file | delete_file
+    file_format: csv
+    file_path: path/to/file.csv
+  options:
+    key: value
 gx:
   datasource_name: pass
   data_asset_name: pass
