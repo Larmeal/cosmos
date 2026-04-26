@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class ExpectationSuiteConfig(BaseModel):
 
     Attributes:
         name: The name of the expectation suite.
-        expectations: A dictionary of individual expectation configurations, keyed by their names.
+        expectations: A list of individual expectation configurations.
     """
 
     name: str
@@ -45,29 +45,3 @@ class GXConfig(BaseModel):
     expectation_suite_name: str
     checkpoint_name: str
     expectation_suite: ExpectationSuiteConfig
-
-
-class SourceConfig(BaseModel):
-    """Configuration for the input data source.
-
-    Attributes:
-        type: The storage backend type. Restricted to specific literal values.
-        file_format: The format of the file (e.g., 'csv', 'parquet').
-        file_path: The URI or local path to the data.
-        options: Additional reading options (e.g., delimiter, header rules).
-    """
-
-    type: Literal["local", "aws", "gcp", "azure"]
-    file_format: str
-    file_path: str
-    options: dict[str, Any] = Field(default_factory=dict)
-
-
-class ValidationFrameworkConfig(BaseModel):
-    """
-    A configuration class for the entire system, encompassing both GX and source configurations.
-    """
-
-    engine: Literal["pandas", "spark", "sql"]
-    gx: GXConfig
-    source: SourceConfig
