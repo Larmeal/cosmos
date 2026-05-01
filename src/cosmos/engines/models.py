@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from cosmos.destination.models import DestinationConfig
 from cosmos.gx.models import GXConfig
@@ -20,7 +20,14 @@ class ValidationFrameworkConfig(BaseModel):
         destination: Configuration for the output sink. Optional.
     """
 
-    engine: Literal["pandas", "spark", "sql"]
-    source: SourceConfig
-    gx: GXConfig
-    destination: DestinationConfig | None = None
+    engine: Literal["pandas", "spark", "sql"] = Field(
+        description="The DataFrame engine used to load and process data."
+    )
+    source: SourceConfig = Field(description="Configuration for the input data source.")
+    gx: GXConfig = Field(
+        description="Configuration for the Great Expectations validation workflow."
+    )
+    destination: DestinationConfig | None = Field(
+        default=None,
+        description="Configuration for the output sink. Optional.",
+    )
