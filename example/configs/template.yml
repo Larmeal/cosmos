@@ -7,13 +7,11 @@ source:
     key: value
 destination:
   type: local | aws | gcp | azure
-  file_format: csv
-  file_path: path/to/file.csv
+  dir_path: path/to/directory
   on_failure_action:
     type: local | aws | gcp | azure
     action: metadata_only | move_file | copy_file | delete_file
-    file_format: csv
-    file_path: path/to/file.csv
+    dir_path: path/to/directory
   options:
     key: value
 gx:
