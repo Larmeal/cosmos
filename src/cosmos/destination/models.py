@@ -1,56 +1,78 @@
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 
-class OnFailureActionConfig(BaseModel):
-    """What to do when GX validation fails.
+class BaseFailureAction(BaseModel):
+    """Base configuration for all failure actions.
 
-    Actions and their required fields:
-
-    - ``metadata_only``: Export validation metadata (errors, stats, run info) to a
-        destination for later lookup. Requires ``type``, ``file_format``, ``file_path``.
-    - ``move_file``: Move the raw source file to a failure zone. Requires ``type``,
-        ``file_format``, ``file_path``.
-    - ``copy_file``: Copy the raw source file to a failure zone. Requires ``type``,
-        ``file_format``, ``file_path``.
-    - ``delete_file``: Delete the raw source file in-place. No destination required.
-
-    Attributes:
-        type: Storage backend for the failure destination.
-        action: The operation to perform on failure.
-        file_format: Format of the file written to the failure destination.
-        file_path: Path where the failure output (metadata or raw data) is written.
+    All actions need to know which storage backend they are operating on.
     """
 
-    type: Literal["local", "aws", "gcp", "azure"] | None = None
-    action: Literal["metadata_only", "move_file", "copy_file", "delete_file"]
-    file_format: str | None = None
-    file_path: str | None = None
-
-    @model_validator(mode="after")
-    def validate_relocation_fields(self) -> "OnFailureActionConfig":
-        """Require destination fields for actions that write output on failure.
-
-        ``metadata_only``, ``move_file``, and ``copy_file`` all write to a
-        destination and therefore require ``type``, ``file_format``, and
-        ``file_path``. ``delete_file`` removes the source in-place and needs
-        no destination.
-        """
-        if self.action in {"move_file", "copy_file", "metadata_only"}:
-            missing = [
-                field
-                for field in ("type", "file_format", "file_path")
-                if getattr(self, field) is None
-            ]
-            if missing:
-                raise ValueError(
-                    f"on_failure_action with action='{self.action}' requires: {', '.join(missing)}"
-                )
-        return self
+    type: Literal["local", "aws", "gcp", "azure"] = Field(
+        description="The storage backend type this action operates on."
+    )
 
 
-class DestinationConfig(BaseModel):
+class IgnoreFailureAction(BaseFailureAction):
+    """Configuration for ignoring the failure.
+
+    The framework will do nothing to the raw source file and will simply
+    let the pipeline fail. No storage type or destination paths are required.
+    """
+
+    action: Literal["ignore"] = Field(
+        description="Action identifier, fixed to 'ignore'."
+    )
+
+
+class DeleteFailureAction(BaseFailureAction):
+    """Configuration for deleting the raw source file in-place."""
+
+    action: Literal["delete_file"] = Field(
+        description="Action identifier, fixed to 'delete_file'."
+    )
+
+
+class RelocateFailureAction(BaseFailureAction):
+    """Configuration for actions that require a destination path."""
+
+    action: Literal["metadata_only", "move_file", "copy_file"] = Field(
+        description="The relocation action to perform: save metadata only, move, or copy the file."
+    )
+    dir_path: str = Field(
+        description=(
+            "The directory path where the file should be moved/copied or where metadata should be saved. "
+            "Supports both relative and absolute paths for local storage, "
+            "and should be a valid URI for cloud storage (e.g., 'gs://bucket_name/path/to/directory')."
+        ),
+        examples=[
+            "./data/dead-letters",
+            "./data/dead-letters/",
+            "gs://my-bucket/dead-letters",
+            "gs://my-bucket/dead-letters/",
+        ],
+    )
+
+    @field_validator("dir_path", mode="after")
+    @classmethod
+    def validate_local_dir_path(cls, value: str) -> str:
+        """Validator to ensure that dir_path for local storage is not empty or root directory"""
+
+        cleaned_path = value.rstrip("/")
+        if not cleaned_path or cleaned_path == "/":
+            raise ValueError("dir_path cannot be empty or root directory ('/')")
+
+        return cleaned_path
+
+
+OnFailureActionConfig = Annotated[
+    IgnoreFailureAction | DeleteFailureAction | RelocateFailureAction,
+    Field(discriminator="action"),
+]
+
+
+class BaseDestinationConfig(BaseModel):
     """Configuration for the output sink of validated data.
 
     This is where the successfully processed data is written.
@@ -60,14 +82,54 @@ class DestinationConfig(BaseModel):
 
     Attributes:
         type: Storage backend type for the output.
-        file_format: Format of the output file (e.g., 'csv', 'parquet').
-        file_path: URI or local path where the output should be saved.
+        dir_path: URI or local path where the output should be saved.
         on_failure_action: Action to apply to the raw source data on failure.
         options: Additional writing options (e.g., compression, header rules).
     """
 
-    type: Literal["local", "aws", "gcp", "azure"]
-    file_format: str
-    file_path: str
-    on_failure_action: OnFailureActionConfig | None = None
-    options: dict[str, Any] = Field(default_factory=dict)
+    dir_path: str = Field(
+        description="Local path or cloud URI of the directory where the output should be written."
+    )
+    on_failure_action: OnFailureActionConfig | None = Field(
+        default=None,
+        description="Action to apply to the raw source data when GX validation fails.",
+    )
+    options: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional backend-specific writing options (e.g., compression, header rules).",
+    )
+
+
+class LocalDestinationConfig(BaseDestinationConfig):
+    """Configuration for a local file destination.
+
+    Attributes:
+        type: Storage backend type, fixed to 'local'.
+        dir_path: Local path where the output should be saved.
+        on_failure_action: Action to apply to the raw source data on failure.
+        options: Additional writing options (e.g., compression, header rules).
+    """
+
+    type: Literal["local"] = Field(
+        default="local", description="Storage backend type, fixed to 'local'."
+    )
+
+
+class GCPDestinationConfig(BaseDestinationConfig):
+    """Configuration for a Google Cloud Storage destination.
+
+    Attributes:
+        type: Storage backend type, fixed to 'gcp'.
+        dir_path: URI to the output location in GCS (e.g., 'gs://bucket_name/path/to/directory').
+        on_failure_action: Action to apply to the raw source data on failure.
+        options: Additional writing options (e.g., compression, header rules).
+    """
+
+    type: Literal["gcp"] = Field(
+        default="gcp", description="Storage backend type, fixed to 'gcp'."
+    )
+
+
+DestinationConfigType = Annotated[
+    LocalDestinationConfig | GCPDestinationConfig, Field(discriminator="type")
+]
