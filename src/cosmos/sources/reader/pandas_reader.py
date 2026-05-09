@@ -21,22 +21,22 @@ class PandasReader(BaseSourceReader):
             pd.DataFrame: The loaded data as a Pandas DataFrame.
         """
 
-        match self.config.source.file_format.lower():
+        match self.config.file_format.lower():
             case "csv":
                 df = pd.read_csv(
-                    filepath_or_buffer=self.config.source.file_path,
-                    **self.config.source.options,
+                    filepath_or_buffer=self.config.file_path,
+                    **self.config.options,
                 )
                 return df
 
             case "parquet":
                 df = pd.read_parquet(
-                    path=self.config.source.file_path,
-                    **self.config.source.options,
+                    path=self.config.file_path,
+                    **self.config.options,
                 )
                 return df
 
             case _:
                 raise ValueError(
-                    f"File format '{self.config.source.file_format}' is not supported by PandasReader."
+                    f"File format '{self.config.file_format}' is not supported by PandasReader."
                 )

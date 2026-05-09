@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class BaseSourceConfig(BaseModel):
@@ -27,17 +27,16 @@ class BaseSourceConfig(BaseModel):
         description="Additional engine-specific reading options (e.g., delimiter, header).",
     )
 
-    @field_validator("file_path", mode="after")
-    @classmethod
-    def validate_local_file_path(cls, value: str) -> str:
-        """Validator to ensure that file_path for local storage is not empty or root directory"""
+    @model_validator(mode="after")
+    def validate_local_file_path(self) -> "BaseSourceConfig":
+        """Validator to ensure that file_path extension matches file_format"""
 
-        if Path(value).suffix.lower() != f".{cls.file_format.lower()}":
+        if Path(self.file_path).suffix.lower() != f".{self.file_format.lower()}":
             raise ValueError(
-                f"`file_path` must end with a file extension matching `file_format` (.{cls.file_format.lower()}). Got: {value}"
+                f"`file_path` must end with a file extension matching `file_format` (.{self.file_format.lower()}). Got: {self.file_path}"
             )
 
-        return value
+        return self
 
 
 class LocalSourceConfig(BaseSourceConfig):
@@ -68,6 +67,9 @@ class GCPSourceConfig(BaseSourceConfig):
     type: Literal["gcp"] = Field(description="Storage backend type, fixed to 'gcp'.")
 
 
-SourceConfigType = Annotated[
+SourceConfig = Annotated[
     LocalSourceConfig | GCPSourceConfig, Field(discriminator="type")
 ]
+
+# Backwards-compatible alias
+SourceConfigType = SourceConfig
