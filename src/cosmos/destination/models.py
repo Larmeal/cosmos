@@ -130,6 +130,6 @@ class GCPDestinationConfig(BaseDestinationConfig):
     )
 
 
-DestinationConfigType = Annotated[
+DestinationConfig = Annotated[
     LocalDestinationConfig | GCPDestinationConfig, Field(discriminator="type")
 ]
