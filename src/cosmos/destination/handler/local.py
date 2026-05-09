@@ -1,37 +1,16 @@
 import json
 import logging
 import shutil
-from abc import ABC, abstractmethod
 from pathlib import Path
 
+from cosmos.destination.base import BaseFailureHandler
 from cosmos.destination.models import (
     DeleteFailureAction,
     IgnoreFailureAction,
-    OnFailureActionConfig,
     RelocateFailureAction,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class BaseFailureHandler(ABC):
-    """Abstract interface for handling raw file operations on validation failure."""
-
-    @abstractmethod
-    def execute(
-        self,
-        action_config: OnFailureActionConfig,
-        source_path: str,
-        custom_metadata: dict,
-    ) -> None:
-        """Executes the failure action based on the provided configuration.
-
-        Args:
-            action_config: The validated failure action configuration.
-            source_path: The original path of the source file as a string.
-            custom_metadata: The dictionary containing the parsed GX failure details.
-        """
-        pass
 
 
 class LocalFailureHandler(BaseFailureHandler):
@@ -42,7 +21,7 @@ class LocalFailureHandler(BaseFailureHandler):
 
         Args:
             dest_path: The pathlib.Path object representing the destination file.
-            custom_metadata: The dictionary to save as JSON.
+            custom_metadata: The custom system metadata to save as JSON.
         """
 
         meta_path = dest_path / f"{dest_path.stem}_meta.json"
@@ -55,14 +34,13 @@ class LocalFailureHandler(BaseFailureHandler):
 
     def execute(
         self,
-        action_config: OnFailureActionConfig,
         source_path: str,
         custom_metadata: dict,
     ) -> None:
         """Executes the specific local file operation safely using Pattern Matching."""
         src_p = Path(source_path)
 
-        match action_config:
+        match self.config:
             case IgnoreFailureAction():
                 logger.info(
                     "Failure action is 'ignore'. Leaving the source file untouched."
@@ -80,7 +58,13 @@ class LocalFailureHandler(BaseFailureHandler):
                 dest_p = Path(relocate.dir_path)
 
                 # Ensure the destination directory exists before moving/copying
-                dest_p.mkdir(parents=True, exist_ok=True)
+                try:
+                    dest_p.mkdir(parents=True, exist_ok=True)
+                except PermissionError:
+                    logger.error(
+                        f"Permission denied: Cannot create directory at '{dest_p}'."
+                    )
+                    raise
 
                 match relocate.action:
                     case "metadata_only":
