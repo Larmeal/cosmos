@@ -5,10 +5,12 @@ description = "A framework for encapsulating Great Expectations within data pipe
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "great-expectations>=1.15.1",
-    "pandas==2.2.3",
+    "great-expectations==1.17.2",
+    "pandas==2.3.3",
     "pydantic==2.12.5",
+    "pyspark==4.1.1",
     "python-dotenv>=1.2.2",
+    "pyyaml==6.0.3",
 ]
 
 [dependency-groups]
@@ -17,18 +19,19 @@ dev = [
     "ipykernel>=7.2.0",
     "pendulum>=3.2.0",
     "prek>=0.3.8",
-    "pyyaml==6.0.2",
     "ruff>=0.15.7",
 ]
 docs = [
     "mkdocs>=1.6.1",
 ]
 gcp = [
-    "google-cloud-storage==2.19.0",
+    "fsspec==2026.2.0",
+    "gcsfs==2026.2.0",
+    "google-cloud-storage==3.10.1",
 ]
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
