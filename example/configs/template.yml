@@ -1,31 +1,144 @@
-engine: pandas
+# COSMOS configuration — annotated reference
+#
+# Every field is shown here with its allowed values. Fields marked [v0.x] are not
+# available yet; see PROJECT_SUMMARY.md for the roadmap.
+#
+# For a runnable starting point, copy example/configs/minimal.yml instead.
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+
+# Stable name for this pipeline. Must survive a file move or an expectation
+# edit, otherwise reporting history fragments. Forms part of run_id.
+id: customer_daily
+
+# Which engine loads and validates the data.
+engine: pandas                        # pandas | spark [v0.6] | sql [v0.7]
+
+# ---------------------------------------------------------------------------
+# Source — where the data comes from
+# ---------------------------------------------------------------------------
+
 source:
-  type: local | aws | gcp | azure
-  file_format: csv
-  file_path: path/to/file.csv
+  type: local                         # local | gcs [v0.2]
+  file_format: csv                    # csv | parquet
+  file_path: data/test_*.csv          # glob; matches many files, each validated separately
+
+  # What it means when the glob matches nothing. COSMOS cannot tell "no data
+  # today" from "upstream is late", so declare which one this pipeline expects.
+  on_empty: fail                      # fail | skip
+
+  # Passed straight to the engine's reader (pd.read_csv, etc.)
   options:
-    key: value
-destination:
-  type: local | aws | gcp | azure
-  dir_path: path/to/directory
-  on_failure_action:
-    type: local | aws | gcp | azure
-    action: metadata_only | move_file | copy_file | delete_file
-    dir_path: path/to/directory
-  options:
-    key: value
-gx:
-  datasource_name: pass
-  data_asset_name: pass
-  batch_definition_name: pass
-  expectation_suite_name: pass
-  checkpoint_name: pass
-  expectation_suite:
-    name: pass
+    delimiter: ","
+    encoding: utf-8
+
+# A table source instead of files [v0.7] — note it has no file_path or
+# file_format, and no file actions are available:
+#
+# source:
+#   type: bigquery
+#   project: my-project
+#   dataset: raw
+#   table: customers
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+validate:
+
+  # The contract: which expectations to apply. Written inline here; from [v0.5]
+  # it can instead reference a shared file:
+  #
+  #   contract: contracts/customer.yml
+  #
+  contract:
+    name: customer
+
     expectations:
+        # expectation_type is a Great Expectations name, passed through unchanged.
+        # kwargs are that expectation's own arguments.
       - expectation_type: expect_column_values_to_not_be_null
         kwargs:
           column: id
+        severity: critical            # critical | warning | info
+
+        # Optional. Without it a key is derived from the type and kwargs; giving
+        # one makes reports far easier to read.
+        name: id_not_null
+
+        # Optional documentation, carried through to the report.
+        description: An order without an id cannot be reconciled.
+        notes: Added after the 2026-03 incident.
+        meta:
+          owner: data-platform
+
       - expectation_type: expect_column_values_to_be_unique
         kwargs:
           column: id
+        severity: critical
+        name: id_unique
+
+      - expectation_type: expect_column_values_to_be_between
+        kwargs:
+          column: amount
+          min_value: 0
+          max_value: 1000000
+        severity: warning             # warning does not trigger the failure action
+
+  # What happens to the source file when validation fails.
+  #
+  # A report is ALWAYS written — it is not one of these choices. These control
+  # only what happens to the file itself.
+  #
+  # An unreadable file is treated the same as a failed one. An infrastructure
+  # error (timeout, expired credentials) never triggers any action.
+  on_failure:
+    file_action: move                 # none | move | copy [v0.3] | delete [v0.3]
+    dead_letter: output/dead-letters/
+
+# ---------------------------------------------------------------------------
+# Profiling [v0.4] — descriptive statistics recorded over time
+# ---------------------------------------------------------------------------
+
+profile:
+  enabled: false
+
+  # Profiling is a full scan by nature. Sample on large tables.
+  sample:
+    rows: 100000
+
+# ---------------------------------------------------------------------------
+# Great Expectations
+# ---------------------------------------------------------------------------
+
+gx:
+  # Off by default. When disabled nothing is persisted and no gx/ directory is
+  # created. COSMOS's own reports are the source of truth; Data Docs is only
+  # for humans who want to browse results.
+  data_docs:
+    enabled: false
+    # store: output/data_docs/
+
+# ---------------------------------------------------------------------------
+# Reporting — always written, for both validate and profile
+# ---------------------------------------------------------------------------
+
+report:
+  - type: file
+    path: output/reports/
+
+  # [v0.3]
+  # One row per expectation, per origin, per run — an append-only time series.
+  # Drift detection is then an ordinary SQL query over this table.
+  - type: bigquery
+    project: my-project
+    dataset: data_quality
+    write_mode: merge                 # append | overwrite | merge
+
+    # merge is required rather than optional: the report is written once before
+    # the file action (recording intent) and again afterwards (recording the
+    # outcome). With append that produces two contradictory rows.
+    merge_key: [run_id, origin, expectation_key]
