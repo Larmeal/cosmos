@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cosmos.gx.models import GXConfig
 from cosmos.sources.models import SourceConfig
 
 if TYPE_CHECKING:
@@ -24,8 +25,11 @@ class BaseEngine(BaseModel, ABC):
 
     model_config = ConfigDict(extra="forbid")
 
+    id: str = Field(description="A unique identifier for the engine instance.")
     source: SourceConfig = Field(description="Configuration for the input data source.")
-    # gx: GXConfig = Field(description="Configuration for the Great Expectations validation workflow.")
+    validation: GXConfig = Field(
+        description="Configuration for the Great Expectations validation workflow.",
+    )
     # destination: DestinationConfig | None = Field(
     #     default=None,
     #     description="Configuration for the output sink. Optional.",

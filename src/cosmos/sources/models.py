@@ -78,17 +78,17 @@ class LocalSourceConfig(FileBaseConfig):
         return value
 
 
-class GCPSourceConfig(FileBaseConfig):
+class GCSSourceConfig(FileBaseConfig):
     """Configuration for a Google Cloud Storage source.
 
     Attributes:
-        storage: The storage backend type, fixed to 'gcp'.
+        storage: The storage backend type, fixed to 'gcs'.
         file_format: The format of the file (e.g., 'csv', 'parquet').
         file_path: The URI to the data in GCS (e.g., 'gs://bucket_name/path/to/file').
         options: Additional reading options (e.g., delimiter, header rules).
     """
 
-    storage: Literal["gcp"] = Field(description="Storage backend type, fixed to 'gcp'.")
+    storage: Literal["gcs"] = Field(description="Storage backend type, fixed to 'gcs'.")
 
     @field_validator("file_path")
     @classmethod
@@ -109,4 +109,4 @@ class GCPSourceConfig(FileBaseConfig):
         return value
 
 
-SourceConfig = Annotated[LocalSourceConfig | GCPSourceConfig, Field(discriminator="storage")]
+SourceConfig = Annotated[LocalSourceConfig | GCSSourceConfig, Field(discriminator="storage")]
