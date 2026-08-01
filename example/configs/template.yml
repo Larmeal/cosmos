@@ -21,7 +21,7 @@ engine: pandas                        # pandas | spark [v0.6] | sql [v0.7]
 # ---------------------------------------------------------------------------
 
 source:
-  type: local                         # local | gcs [v0.2]
+  storage: local                      # local | gcs [v0.2]
   file_format: csv                    # csv | parquet
   file_path: data/test_*.csv          # glob; matches many files, each validated separately
 
@@ -38,7 +38,7 @@ source:
 # file_format, and no file actions are available:
 #
 # source:
-#   type: bigquery
+#   storage: bigquery
 #   project: my-project
 #   dataset: raw
 #   table: customers
@@ -88,16 +88,27 @@ validate:
           max_value: 1000000
         severity: warning             # warning does not trigger the failure action
 
-  # What happens to the source file when validation fails.
-  #
-  # A report is ALWAYS written — it is not one of these choices. These control
-  # only what happens to the file itself.
-  #
-  # An unreadable file is treated the same as a failed one. An infrastructure
-  # error (timeout, expired credentials) never triggers any action.
-  on_failure:
-    file_action: move                 # none | move | copy [v0.3] | delete [v0.3]
-    dead_letter: output/dead-letters/
+  # An HTML view of the results, rendered by Great Expectations. Off by default:
+  # nothing is written and no directory is created. COSMOS's own reports under
+  # `report:` are the source of truth — this is only for humans who want to
+  # browse results.
+  data_docs:
+    enabled: false
+    # store: output/data_docs/
+
+# ---------------------------------------------------------------------------
+# Failure handling — what happens to the source file
+# ---------------------------------------------------------------------------
+
+# A report is ALWAYS written — it is not one of these choices. These control
+# only what happens to the file itself.
+#
+# This sits beside `validate:` rather than inside it because it also fires for a
+# file that could not be read at all, before any expectation runs. An
+# infrastructure error (timeout, expired credentials) never triggers any action.
+on_failure:
+  file_action: move                   # none | move | copy [v0.3] | delete [v0.3]
+  dead_letter: output/dead-letters/
 
 # ---------------------------------------------------------------------------
 # Profiling [v0.4] — descriptive statistics recorded over time
@@ -109,18 +120,6 @@ profile:
   # Profiling is a full scan by nature. Sample on large tables.
   sample:
     rows: 100000
-
-# ---------------------------------------------------------------------------
-# Great Expectations
-# ---------------------------------------------------------------------------
-
-gx:
-  # Off by default. When disabled nothing is persisted and no gx/ directory is
-  # created. COSMOS's own reports are the source of truth; Data Docs is only
-  # for humans who want to browse results.
-  data_docs:
-    enabled: false
-    # store: output/data_docs/
 
 # ---------------------------------------------------------------------------
 # Reporting — always written, for both validate and profile

@@ -12,7 +12,8 @@ class ExpectationConfig(BaseModel):
         meta: Additional custom metadata for the expectation.
         notes: Free-form text notes for data documentation.
         description: A clear description of why this rule exists.
-        severity: The severity level if this expectation fails.
+        name: An optional stable key for this rule, used in reports.
+        severity: The severity level if this expectation fails. Required.
     """
 
     expectation_type: str = Field(
@@ -34,44 +35,82 @@ class ExpectationConfig(BaseModel):
         default=None,
         description="A clear description of why this rule exists.",
     )
+    name: str | None = Field(
+        default=None,
+        description="An optional name for the expectation. If not provided, a default name will be generated.",
+    )
     severity: Literal["critical", "warning", "info"] = Field(
-        default="warning",
-        description="Determines the pipeline behavior if this expectation fails.",
+        description=(
+            "Determines the pipeline behavior if this expectation fails. Required — "
+            "'critical' triggers the failure action, 'warning' and 'info' are recorded only."
+        ),
     )
 
 
-class ExpectationSuiteConfig(BaseModel):
-    """Configuration for the suite containing multiple expectations.
+class ContractConfig(BaseModel):
+    """The contract for a dataset: the rules it must satisfy.
 
     Attributes:
-        name: The name of the expectation suite.
-        expectations: A list of individual expectation configurations.
+        data_asset_name: The contract's name, written as `name:` in YAML.
+        description: A description of the contract's purpose.
+        expectations: The rules to apply to every origin.
     """
 
-    name: str = Field(description="The name of the expectation suite.")
-    expectations: list[ExpectationConfig] = Field(description="A list of individual expectation configurations.")
-
-
-class GXConfig(BaseModel):
-    """The master configuration for the Great Expectations context.
-
-    Attributes:
-        datasource_name: The name of the GX datasource.
-        data_asset_name: The name of the data asset.
-        batch_definition_name: The name of the batch definition (V1.x architecture).
-        expectation_suite_name: The name used to register the suite.
-        checkpoint_name: The name of the validation checkpoint.
-        expectation_suite: The nested suite configuration.
-    """
-
-    datasource_name: str | None = Field(default=None, description="The name of the GX datasource.")
-    data_asset_name: str = Field(description="The name of the data asset.")
+    description: str | None = Field(
+        default=None,
+        description="A description of the contract's purpose.",
+    )
+    data_asset_name: str = Field(description="The name of the data asset.", alias="name")
+    datasource_name: str | None = Field(
+        default=None,
+        description="The name of the GX datasource.",
+    )
     batch_definition_name: str | None = Field(
         default=None,
         description="The name of the batch definition (V1.x architecture).",
     )
-    expectation_suite_name: str | None = Field(default=None, description="The name used to register the suite.")
-    checkpoint_name: str | None = Field(default=None, description="The name of the validation checkpoint.")
-    expectation_suite: ExpectationSuiteConfig = Field(
+    expectation_suite_name: str | None = Field(
+        default=None,
+        description="The name used to register the suite.",
+    )
+    checkpoint_name: str | None = Field(
+        default=None,
+        description="The name of the validation checkpoint.",
+    )
+    expectations: list[ExpectationConfig] = Field(
         description="The nested expectation suite configuration containing all expectations."
+    )
+
+
+class DataDocsConfig(BaseModel):
+    """Configuration for Great Expectations Data Docs.
+
+    Attributes:
+        enabled: Whether to render the site at all. Off by default.
+        store_path: Where to write it. Nothing is persisted when omitted.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Indicates whether Data Docs generation is enabled.",
+    )
+    store_path: str | None = Field(
+        default=None,
+        description="The path where Data Docs will be stored. If not provided, a default path will be used.",
+    )
+
+
+class GXConfig(BaseModel):
+    """The `validate:` section of the configuration.
+
+    Attributes:
+        contract: The rules to apply, and what each failure means.
+        data_docs: Whether to render an HTML view of the results, and where.
+    """
+
+    contract: ContractConfig = Field(
+        description="The contract for the dataset, including its expectations.",
+    )
+    data_docs: DataDocsConfig = Field(
+        description="Configuration for Great Expectations Data Docs.",
     )
