@@ -13,6 +13,8 @@ dependencies = [
 
 [project.optional-dependencies]
 gcp = [
+    "fsspec>=2026.7.0",
+    "gcsfs>=2026.8.0",
     "google-cloud-bigquery>=3.4,<4",
     "google-cloud-storage>=3.10,<4",
 ]
