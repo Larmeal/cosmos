@@ -107,7 +107,8 @@ validate:
 # file that could not be read at all, before any expectation runs. An
 # infrastructure error (timeout, expired credentials) never triggers any action.
 on_failure:
-  file_action: move                   # none | move | copy [v0.3] | delete [v0.3]
+  action: move                        # ignore | move | copy [v0.3] | delete [v0.3]
+                                      # ignore leaves the file alone; the report is written either way
   dead_letter: output/dead-letters/
 
 # ---------------------------------------------------------------------------
