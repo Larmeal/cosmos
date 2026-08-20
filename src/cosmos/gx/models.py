@@ -112,5 +112,6 @@ class GXConfig(BaseModel):
         description="The contract for the dataset, including its expectations.",
     )
     data_docs: DataDocsConfig = Field(
-        description="Configuration for Great Expectations Data Docs.",
+        default_factory=DataDocsConfig,
+        description="Configuration for Great Expectations Data Docs. Omitted means disabled.",
     )

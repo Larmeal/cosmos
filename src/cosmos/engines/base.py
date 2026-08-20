@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cosmos.actions import IgnoreFailureAction, OnFailureActionConfig
 from cosmos.gx.models import GXConfig
 from cosmos.sources.models import SourceConfig
 
@@ -34,6 +35,10 @@ class BaseEngine(BaseModel, ABC):
     #     default=None,
     #     description="Configuration for the output sink. Optional.",
     # )
+    on_failure: OnFailureActionConfig = Field(
+        default_factory=IgnoreFailureAction,
+        description="What to do with the source file when validation fails. Defaults to leaving it in place.",
+    )
 
     @abstractmethod
     def load_data(self) -> pd.DataFrame | DataFrame | None:
