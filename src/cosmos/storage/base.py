@@ -34,7 +34,7 @@ class BaseStorage(BaseModel, ABC):
         """
 
     @abstractmethod
-    def move(self, src: str, dst_dir: str) -> str:
+    def move_obj(self, src: str, dst_dir: str) -> str:
         """Move a file into a directory.
 
         The file keeps its own name at the destination, and the directory is
@@ -49,7 +49,7 @@ class BaseStorage(BaseModel, ABC):
         """
 
     @abstractmethod
-    def copy(self, src: str, dst_dir: str) -> str:
+    def copy_obj(self, src: str, dst_dir: str) -> str:
         """Copy a file into a directory, leaving the original in place.
 
         The copy keeps the source's name, and the directory is created if it does
@@ -64,7 +64,7 @@ class BaseStorage(BaseModel, ABC):
         """
 
     @abstractmethod
-    def delete(self, uri: str) -> None:
+    def delete_obj(self, uri: str) -> None:
         """Delete a file.
 
         A file that is already absent is not an error.

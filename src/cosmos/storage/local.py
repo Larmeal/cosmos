@@ -65,7 +65,7 @@ class LocalStorage(BaseStorage):
         """
         return sorted(p for p in _fs_glob(pattern, recursive=True) if Path(p).is_file())
 
-    def move(self, src: str, dst_dir: str) -> str:
+    def move_obj(self, src: str, dst_dir: str) -> str:
         """Move a file into a directory, letting the OS perform the move.
 
         Within one filesystem this is a rename and therefore atomic; across
@@ -95,7 +95,7 @@ class LocalStorage(BaseStorage):
         logger.info("moved %s -> %s", src, dest)
         return str(dest)
 
-    def copy(self, src: str, dst_dir: str) -> str:
+    def copy_obj(self, src: str, dst_dir: str) -> str:
         """Copy a file into a directory, leaving the original in place.
 
         Metadata is preserved (``shutil.copy2``), so the copy keeps the
@@ -120,7 +120,7 @@ class LocalStorage(BaseStorage):
         logger.info("copied %s -> %s", src, dest)
         return str(dest)
 
-    def delete(self, uri: str) -> None:
+    def delete_obj(self, uri: str) -> None:
         """Delete a file, treating one that is already gone as success.
 
         A re-run after a crash mid-action can find the file deleted by the

@@ -4,9 +4,8 @@
 
 default_install_hook_types = [
   "pre-commit",
-  "commit-msg",
-  "pre-push"
   ]
+default_stages = ["pre-commit"]
 default_language_version = { python = "python3.11" }
 
 [[repos]]
@@ -21,12 +20,10 @@ hooks = [
       "jupyter",
       "pyproject"
     ],
-    args = ["--fix"],
-    stages = ["pre-commit"]
+    args = ["--fix"]
   },
   {
-    id = "ruff-format",
-    stages = ["pre-commit"]
+    id = "ruff-format"
   }
 ]
 
@@ -36,8 +33,7 @@ rev = "v3.21.2"
 hooks = [
   {
     id = "pyupgrade",
-    args = ["--py311-plus"],
-    stages = ["pre-commit"]
+    args = ["--py311-plus"]
   }
 ]
 
@@ -45,41 +41,19 @@ hooks = [
 repo = "https://github.com/pre-commit/pre-commit-hooks"
 rev = "v6.0.0"
 hooks = [
-  {
-    id = "trailing-whitespace",
-    stages = ["pre-commit"]
-  },
-  {
-    id = "end-of-file-fixer",
-    stages = ["pre-commit"]
-  },
-  {
-    id = "check-yaml",
-    args = ["--unsafe"],
-    stages = ["pre-commit"]
-  },
-  {
-    id = "check-toml",
-    stages = ["pre-commit"]
-  },
-  {
-    id = "fix-byte-order-marker",
-    stages = ["pre-commit"]
-  },
-  {
-    id = "name-tests-test",
-    args = ["--pytest-test-first"],
-    stages = ["pre-commit"]
-  }
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "check-yaml", args = ["--unsafe"] },
+  { id = "check-toml" },
+  { id = "fix-byte-order-marker" },
+  { id = "name-tests-test", args = ["--pytest-test-first"] }
 ]
 
 [[repos]]
 repo = "https://github.com/gitleaks/gitleaks"
 rev = "v8.24.2"
 hooks = [
-  {
-    id = "gitleaks"
-  }
+  { id = "gitleaks" }
 ]
 
 [[repos]]
