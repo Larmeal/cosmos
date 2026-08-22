@@ -88,6 +88,7 @@ rev   = "v4.18.0"
 hooks = [
   {
     id = "commitizen",
+    stages = ["commit-msg"]
   },
   {
     id = "commitizen-branch",
