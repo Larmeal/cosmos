@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from cosmos.actions import IgnoreFailureAction, OnFailureActionConfig
+from cosmos.actions import DeleteFailureAction, IgnoreFailureAction, OnFailureActionConfig, RelocateFailureAction
 from cosmos.gx.models import GXConfig
-from cosmos.sources.models import SourceConfig
+from cosmos.sources import SourceConfig
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -39,6 +39,14 @@ class BaseEngine(BaseModel, ABC):
         default_factory=IgnoreFailureAction,
         description="What to do with the source file when validation fails. Defaults to leaving it in place.",
     )
+
+    @model_validator(mode="after")
+    def _inherit_storage(self) -> Self:
+        if (
+            isinstance(self.on_failure, DeleteFailureAction) or isinstance(self.on_failure, RelocateFailureAction)
+        ) and self.on_failure.storage is None:
+            self.on_failure.storage = self.source.backend
+        return self
 
     @abstractmethod
     def load_data(self) -> pd.DataFrame | DataFrame | None:
