@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from cosmos.storage.base import BaseStorage
+from cosmos.storage import StorageBackend
 
 
 class BaseFailureAction(BaseModel, ABC):
@@ -15,11 +15,11 @@ class BaseFailureAction(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
-    def handle(self, storage: BaseStorage) -> None:
+    def handle(self) -> None:
         """Perform the action on the source file."""
 
-    def execute(self, storage: BaseStorage) -> None:
-        return self.handle(storage=storage)
+    def execute(self) -> None:
+        return self.handle()
 
 
 class IgnoreFailureAction(BaseFailureAction):
@@ -34,7 +34,7 @@ class IgnoreFailureAction(BaseFailureAction):
         description="Action identifier, fixed to 'ignore'. The file is left untouched; the report is still written.",
     )
 
-    def handle(self, storage: BaseStorage) -> None:
+    def handle(self) -> None:
         """Do nothing to the source file."""
         return None
 
@@ -43,8 +43,12 @@ class DeleteFailureAction(BaseFailureAction):
     """Configuration for deleting the raw source file in-place."""
 
     action: Literal["delete"] = Field(description="Action identifier, fixed to 'delete'.")
+    storage: StorageBackend | None = Field(
+        default=None,
+        description="The storage backend to use for the action. If not provided, the storage backend will be inferred from the source configuration.",
+    )
 
-    def handle(self, storage: BaseStorage) -> None:
+    def handle(self) -> None:
         """Handle the delete action.
 
         This method deletes the raw source file in-place using the provided storage backend.
@@ -68,6 +72,10 @@ class RelocateFailureAction(BaseFailureAction):
             "gs://my-bucket/dead-letters/",
         ],
     )
+    storage: StorageBackend | None = Field(
+        default=None,
+        description="The storage backend to use for the action. If not provided, the storage backend will be inferred from the source configuration.",
+    )
 
     @field_validator("dead_letter", mode="after")
     @classmethod
@@ -80,7 +88,7 @@ class RelocateFailureAction(BaseFailureAction):
 
         return cleaned_path
 
-    def handle(self, storage: BaseStorage) -> None:
+    def handle(self) -> None:
         """Handle the relocation action.
 
         This method is intended to be overridden by subclasses that implement specific relocation actions.
@@ -93,7 +101,7 @@ class MoveFailureAction(RelocateFailureAction):
 
     action: Literal["move"] = Field(description="Action identifier, fixed to 'move'.")
 
-    def handle(self, storage: BaseStorage) -> None:
+    def handle(self) -> None:
         """Handle the relocation action.
 
         This method is intended to be overridden by subclasses that implement specific relocation actions.
@@ -106,7 +114,7 @@ class CopyFailureAction(RelocateFailureAction):
 
     action: Literal["copy"] = Field(description="Action identifier, fixed to 'copy'.")
 
-    def handle(self, storage: BaseStorage) -> None:
+    def handle(self) -> None:
         """Handle the relocation action.
 
         This method is intended to be overridden by subclasses that implement specific relocation actions.

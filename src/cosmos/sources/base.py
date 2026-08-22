@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-
-if TYPE_CHECKING:
-    from cosmos.storage import StorageBackend
 
 
 class BaseConfig(BaseModel, ABC):
@@ -57,16 +54,3 @@ class FileBaseConfig(BaseConfig):
         """,
         ).strip(),
     )
-
-    @property
-    @abstractmethod
-    def backend(self) -> StorageBackend:
-        """The storage system that owns the files this source describes.
-
-        Used to read the source's files, and inherited by ``on_failure`` when it
-        does not declare a backend of its own.
-
-        Returns:
-            The backend for this source's storage kind. Implementations cache the
-            instance, so a run holds one client rather than one per call.
-        """
