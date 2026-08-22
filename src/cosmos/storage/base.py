@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from pydantic import BaseModel
 
-class BaseStorage(ABC):
+
+class BaseStorage(BaseModel, ABC):
     """Interface for file operations on a storage backend.
 
     One subclass per backend — local disk, GCS, S3 — each implemented with that

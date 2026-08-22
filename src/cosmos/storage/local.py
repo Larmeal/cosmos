@@ -4,6 +4,9 @@ import logging
 import shutil
 from glob import glob as _fs_glob
 from pathlib import Path
+from typing import Literal
+
+from pydantic import Field
 
 from cosmos.storage.base import BaseStorage
 
@@ -17,6 +20,8 @@ class LocalStorage(BaseStorage):
     and moves bytes. Which file to move, where to, and what the outcome means are
     decided in ``actions.py``.
     """
+
+    storage: Literal["local"] = Field(description="The storage backend type, such as 'local'")
 
     @staticmethod
     def _prepare(src: str, dst_dir: str) -> Path:
