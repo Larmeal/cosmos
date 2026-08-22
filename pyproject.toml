@@ -1,6 +1,6 @@
 [project]
 name = "cosmos"
-version = "0.1.0"
+version = "0.2.0"
 description = "A framework for encapsulating Great Expectations within data pipelines, providing reusable validation layers, expectation suite management, and seamless pipeline integration."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,6 +24,7 @@ spark = [
 
 [dependency-groups]
 dev = [
+    "commitizen>=4.18.0",
     "faker>=40.11.1",
     "ipykernel>=7.2.0",
     "pendulum>=3.2.0",
@@ -55,3 +56,11 @@ ignore = ["UP015", "E501"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "0.1.0"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+major_version_zero = true
