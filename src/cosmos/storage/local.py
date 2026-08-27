@@ -75,7 +75,7 @@ class LocalStorage(BaseStorage):
         """
         stat = entry.stat()
         return SourceObjectMetadata(
-            path=str(entry),
+            path=str(Path(entry).resolve()),
             size_bytes=stat.st_size,
             modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC),
         )
