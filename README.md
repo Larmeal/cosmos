@@ -69,8 +69,9 @@ only validation can trigger an action on the source file.
 - **A report is always written**, independently of the file action, so "write to BigQuery *and* move
   the file" is expressible. The report is written *before* the file is touched.
 - **One file = one batch**, so a result can always name the file it came from.
-- **An error taxonomy that decides retryability** — `ConfigError` aborts, `DataError` dead-letters,
-  and `InfraError` touches nothing so the orchestrator can retry.
+- **A two-class error taxonomy that decides retryability** — `ConfigError` aborts the run, and
+  `DataError` dead-letters one origin. Anything else is fatal by construction: it propagates with
+  nothing touched, so a network blip cannot quarantine healthy files.
 - **Partial failure continues** — a bad file is skipped and recorded; the remaining files still run.
 - **Library first, CLI second.** The library returns the reasoning; the CLI wraps it.
 

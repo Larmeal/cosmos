@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from cosmos.result import ActionName
 from cosmos.storage import StorageBackend
 
 
@@ -29,8 +30,8 @@ class IgnoreFailureAction(BaseFailureAction):
     naming the file and what failed in it. No destination path is required.
     """
 
-    action: Literal["ignore"] = Field(
-        default="ignore",
+    action: Literal[ActionName.IGNORE] = Field(
+        default=ActionName.IGNORE,
         description="Action identifier, fixed to 'ignore'. The file is left untouched; the report is still written.",
     )
 
@@ -42,7 +43,7 @@ class IgnoreFailureAction(BaseFailureAction):
 class DeleteFailureAction(BaseFailureAction):
     """Configuration for deleting the raw source file in-place."""
 
-    action: Literal["delete"] = Field(description="Action identifier, fixed to 'delete'.")
+    action: Literal[ActionName.DELETE] = Field(description="Action identifier, fixed to 'delete'.")
     storage: StorageBackend | None = Field(
         default=None,
         description="The storage backend to use for the action. If not provided, the storage backend will be inferred from the source configuration.",
@@ -99,7 +100,7 @@ class RelocateFailureAction(BaseFailureAction):
 class MoveFailureAction(RelocateFailureAction):
     """Configuration for moving the raw source file to a dead-letter directory."""
 
-    action: Literal["move"] = Field(description="Action identifier, fixed to 'move'.")
+    action: Literal[ActionName.MOVE] = Field(description="Action identifier, fixed to 'move'.")
 
     def handle(self) -> None:
         """Handle the relocation action.
@@ -112,7 +113,7 @@ class MoveFailureAction(RelocateFailureAction):
 class CopyFailureAction(RelocateFailureAction):
     """Configuration for copying the raw source file to a dead-letter directory."""
 
-    action: Literal["copy"] = Field(description="Action identifier, fixed to 'copy'.")
+    action: Literal[ActionName.COPY] = Field(description="Action identifier, fixed to 'copy'.")
 
     def handle(self) -> None:
         """Handle the relocation action.
