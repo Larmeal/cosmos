@@ -30,6 +30,7 @@ class FileBaseConfig(BaseConfig):
     Attributes:
         file_format: The format of the file (e.g., 'csv', 'parquet', 'json').
         file_path: The path or URI to the data.
+        on_empty: Whether the glob matching no files is an error or a normal day.
         options: Additional engine-specific reading options (e.g., delimiter, header).
     """
 
@@ -37,7 +38,13 @@ class FileBaseConfig(BaseConfig):
     file_path: str = Field(description="The path or URI pointing to the source data file including file name.")
     on_empty: Literal["fail", "skip"] = Field(
         default="skip",
-        description="The action to take when the source file is empty. Options are 'fail' or 'skip'.",
+        description=(
+            "What it means when the glob matches no files at all. COSMOS cannot tell "
+            "'nothing arrived today, which is normal' apart from 'the upstream job did not run', "
+            "so the declaration has to say which one it is. A report is written either way. "
+            "This is a run-level event and has nothing to do with a file that is found but holds "
+            "zero rows — that is recorded on the source object as a warning."
+        ),
     )
     options: dict[str, Any] = Field(
         default_factory=dict,

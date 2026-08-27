@@ -40,9 +40,9 @@ class ExpectationConfig(BaseModel):
         description="An optional name for the expectation. If not provided, a default name will be generated.",
     )
     severity: Literal["critical", "warning", "info"] = Field(
+        default="critical",
         description=(
-            "Determines the pipeline behavior if this expectation fails. Required — "
-            "'critical' triggers the failure action, 'warning' and 'info' are recorded only."
+            "The severity level if this expectation fails. 'critical' triggers the failure action, 'warning' and 'info' are recorded only. Defaults to 'critical'."
         ),
     )
 
@@ -53,7 +53,7 @@ class ContractConfig(BaseModel):
     Attributes:
         data_asset_name: The contract's name, written as `name:` in YAML.
         description: A description of the contract's purpose.
-        expectations: The rules to apply to every origin.
+        expectations: The rules to apply to every source object.
     """
 
     description: str | None = Field(

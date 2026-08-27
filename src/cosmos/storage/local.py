@@ -27,7 +27,7 @@ class LocalStorage(BaseStorage):
     def _prepare(src: str, dst_dir: str) -> Path:
         """Create the destination directory and work out the target path.
 
-        The moved file keeps its own name, so two origins sharing a basename
+        The moved file keeps its own name, so two source objects sharing a basename
         resolve to the same target. See ``move`` for what that costs.
 
         Args:
@@ -52,7 +52,7 @@ class LocalStorage(BaseStorage):
 
         Relative and absolute patterns are both accepted, as is a recursive
         ``**``. Directories are filtered out, so a pattern that matches one
-        contributes nothing rather than producing an origin that cannot be read.
+        contributes nothing rather than producing a source object that cannot be read.
 
         Args:
             pattern: A local glob, e.g. ``data/test_*.csv``. A path with no
@@ -60,7 +60,7 @@ class LocalStorage(BaseStorage):
 
         Returns:
             The matching file paths, sorted, so the order a run processes its
-            origins in is reproducible. Empty when nothing matches, which is a
+            source objects in is reproducible. Empty when nothing matches, which is a
             valid outcome that ``source.on_empty`` assigns meaning to.
         """
         return sorted(p for p in _fs_glob(pattern, recursive=True) if Path(p).is_file())
