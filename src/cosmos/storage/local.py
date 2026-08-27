@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import shutil
+from collections.abc import Iterable
 from glob import glob as _fs_glob
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 
+from cosmos.result import SourceObjectMetadata
 from cosmos.storage.base import BaseStorage
 
 logger = logging.getLogger(__name__)
@@ -47,23 +50,35 @@ class LocalStorage(BaseStorage):
         directory.mkdir(parents=True, exist_ok=True)
         return directory / Path(src).name
 
-    def glob(self, pattern: str) -> list[str]:
-        """Expand a local glob into the files it matches.
+    def _list_files(self, pattern: str) -> Iterable[Path]:
+        """Expand a local glob, keeping only files.
 
         Relative and absolute patterns are both accepted, as is a recursive
-        ``**``. Directories are filtered out, so a pattern that matches one
-        contributes nothing rather than producing a source object that cannot be read.
+        ``**``. A directory that matches contributes nothing rather than a source
+        object that cannot be read.
 
         Args:
             pattern: A local glob, e.g. ``data/test_*.csv``. A path with no
                 wildcard matches only itself.
-
-        Returns:
-            The matching file paths, sorted, so the order a run processes its
-            source objects in is reproducible. Empty when nothing matches, which is a
-            valid outcome that ``source.on_empty`` assigns meaning to.
         """
-        return sorted(p for p in _fs_glob(pattern, recursive=True) if Path(p).is_file())
+        return (p for p in map(Path, _fs_glob(pattern, recursive=True)) if p.is_file())
+
+    def _to_metadata(self, entry: Path) -> SourceObjectMetadata:
+        """Read size and mtime from a single ``os.stat`` call.
+
+        The path is kept exactly as the glob produced it — not resolved — so it
+        matches the ``source_object`` key the report is written under.
+
+        Raises:
+            OSError: If the file cannot be stat'd, most often because it vanished
+                between the listing and this call.
+        """
+        stat = entry.stat()
+        return SourceObjectMetadata(
+            path=str(entry),
+            size_bytes=stat.st_size,
+            modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC),
+        )
 
     def move_obj(self, src: str, dst_dir: str) -> str:
         """Move a file into a directory, letting the OS perform the move.
