@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 
 from pydantic import BaseModel
+
+from cosmos.result import SourceObjectMetadata
 
 
 class BaseStorage(BaseModel, ABC):
@@ -10,8 +13,8 @@ class BaseStorage(BaseModel, ABC):
 
     One subclass per backend — local disk, GCS, S3 — each implemented with that
     backend's own SDK. ``glob`` resolves a source pattern into the files a run
-    will process; ``move``, ``copy`` and ``delete`` relocate or remove a file
-    after validation fails.
+    will process, each with the size and mtime the planner renders; ``move``,
+    ``copy`` and ``delete`` relocate or remove a file after validation fails.
 
     Reading is not part of this interface: engines read by URI with their own
     readers.
@@ -20,17 +23,44 @@ class BaseStorage(BaseModel, ABC):
     storage, ``gs://bucket/key`` for GCS.
     """
 
-    @abstractmethod
-    def glob(self, pattern: str) -> list[str]:
-        """Expand a pattern into the URIs of the files it matches.
+    def glob(self, pattern: str) -> list[SourceObjectMetadata]:
+        """Resolve a pattern into the objects it matches, metadata included.
+
+        Template method: the shape of the result is fixed here so every backend
+        agrees on it — sorted by ``path`` for a reproducible processing order,
+        directories never present. Backends supply the two halves: ``_list_files``
+        walks the backend, ``_to_metadata`` turns one native entry into a
+        ``SourceObjectMetadata``.
 
         Args:
             pattern: A glob in the backend's syntax, such as ``data/test_*.csv``.
                 A pattern containing no wildcard matches only itself.
 
         Returns:
-            The matching file URIs, sorted. Directories are excluded. Empty when
-            nothing matches.
+            The matching objects, sorted by ``path``. Empty when nothing matches,
+            which ``source.on_empty`` assigns meaning to.
+        """
+        return sorted(
+            (self._to_metadata(entry) for entry in self._list_files(pattern)),
+            key=lambda meta: meta.path,
+        )
+
+    @abstractmethod
+    def _list_files(self, pattern: str) -> Iterable[object]:
+        """Yield one backend-native entry per matching file.
+
+        Directories are excluded here, not downstream. The entry type is the
+        backend's own — a ``Path`` for local disk, a ``Blob`` for GCS — and is
+        only ever consumed by this backend's ``_to_metadata``, which narrows it.
+        """
+
+    @abstractmethod
+    def _to_metadata(self, entry: object) -> SourceObjectMetadata:
+        """Map one entry from ``_list_files`` to a ``SourceObjectMetadata``.
+
+        Must populate ``path``, ``size_bytes`` and ``modified``. The entry already
+        carries what is needed — a GCS ``Blob`` from a listing has ``size`` and
+        ``updated`` on it — so this never issues another request.
         """
 
     @abstractmethod

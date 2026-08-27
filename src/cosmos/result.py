@@ -13,12 +13,21 @@ class ActionName(StrEnum):
 
 
 class SourceObjectMetadata(BaseModel):
-    """
-    A class to hold metadata about the source object of a dataset.
+    """Resolved reality for one source object: where it is, how big, how old.
+
+    Produced by ``storage.glob`` — every backend fills the same three required
+    fields from its own listing, so a missing one fails at construction rather
+    than surfacing as a hole in the report. ``metadata`` is a backend-specific
+    bag that nothing downstream interprets.
     """
 
-    path: str = Field(description="The path to the source object.")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata about the source object.")
+    path: str = Field(description="Full URI of the source object — the report's source_object key.")
+    size_bytes: int = Field(description="Object size in bytes, from the listing.")
+    modified: datetime.datetime = Field(description="Last-modified time (UTC), from the listing.")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Backend-specific extras nothing downstream interprets (e.g. GCS etag, md5_hash).",
+    )
 
 
 class ExpectationResult(BaseModel):
