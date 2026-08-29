@@ -7,11 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cosmos.actions import DeleteFailureAction, IgnoreFailureAction, OnFailureActionConfig, RelocateFailureAction
 from cosmos.gx.models import GXConfig
+from cosmos.sinks import SinkConfig
 from cosmos.sources import SourceConfig
 
 if TYPE_CHECKING:
     import pandas as pd
-    from pyspark.sql import DataFrame
+    from pyspark.sql import DataFrame as SparkDataFrame
 
 
 class BaseEngine(BaseModel, ABC):
@@ -31,25 +32,24 @@ class BaseEngine(BaseModel, ABC):
     validation: GXConfig = Field(
         description="Configuration for the Great Expectations validation workflow.",
     )
-    # destination: DestinationConfig | None = Field(
-    #     default=None,
-    #     description="Configuration for the output sink. Optional.",
-    # )
+    report: SinkConfig = Field(
+        description="Configuration for the output sink.",
+    )
     on_failure: OnFailureActionConfig = Field(
         default_factory=IgnoreFailureAction,
         description="What to do with the source file when validation fails. Defaults to leaving it in place.",
     )
 
     @model_validator(mode="after")
-    def _inherit_storage(self) -> Self:
+    def _inherit_storage_for_action(self) -> Self:
         if (
             isinstance(self.on_failure, DeleteFailureAction) or isinstance(self.on_failure, RelocateFailureAction)
-        ) and self.on_failure.storage is None:
-            self.on_failure.storage = self.source.backend
+        ) and self.on_failure.backend is None:
+            self.on_failure.backend = self.source.backend
         return self
 
     @abstractmethod
-    def load_data(self) -> pd.DataFrame | DataFrame | None:
+    def load_data(self) -> pd.DataFrame | SparkDataFrame | None:
         """Load data from the specified source.
 
         This method should be implemented by subclasses to handle the specific

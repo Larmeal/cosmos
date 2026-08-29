@@ -3,8 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from cosmos.result import ActionName
-from cosmos.storage import StorageBackend
+from cosmos.results import ActionName
+from cosmos.storages import StorageBackend
 
 
 class BaseFailureAction(BaseModel, ABC):
@@ -44,7 +44,7 @@ class DeleteFailureAction(BaseFailureAction):
     """Configuration for deleting the raw source file in-place."""
 
     action: Literal[ActionName.DELETE] = Field(description="Action identifier, fixed to 'delete'.")
-    storage: StorageBackend | None = Field(
+    backend: StorageBackend | None = Field(
         default=None,
         description="The storage backend to use for the action. If not provided, the storage backend will be inferred from the source configuration.",
     )
@@ -73,7 +73,7 @@ class RelocateFailureAction(BaseFailureAction):
             "gs://my-bucket/dead-letters/",
         ],
     )
-    storage: StorageBackend | None = Field(
+    backend: StorageBackend | None = Field(
         default=None,
         description="The storage backend to use for the action. If not provided, the storage backend will be inferred from the source configuration.",
     )

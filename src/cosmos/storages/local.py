@@ -10,8 +10,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from cosmos.result import SourceObjectMetadata
-from cosmos.storage.base import BaseStorage
+from cosmos.results import SourceObjectMetadata
+from cosmos.storages.base import BaseStorage
 
 logger = logging.getLogger(__name__)
 

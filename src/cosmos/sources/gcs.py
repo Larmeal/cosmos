@@ -8,7 +8,7 @@ from pydantic import Field, field_validator
 from cosmos.sources.base import FileBaseConfig
 
 if TYPE_CHECKING:
-    from cosmos.storage import StorageBackend
+    from cosmos.storages import StorageBackend
 
 
 class GCSSourceConfig(FileBaseConfig):

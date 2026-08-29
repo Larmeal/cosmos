@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 
 from cosmos.sources.base import FileBaseConfig
-from cosmos.storage.local import LocalStorage
+from cosmos.storages.local import LocalStorage
 
 logger = logging.getLogger(__name__)
 
