@@ -76,7 +76,7 @@ class GXValidator:
         data_source = self.context.data_sources.add_pandas(name=self._datasource_name)
         data_asset = data_source.add_dataframe_asset(name=self._data_asset_name)
         batch_definition = data_asset.add_batch_definition_whole_dataframe(
-            name=self._batch_definition_name,
+            name=self._batch_definition_name,  # type: ignore - Never None value
         )
 
         batch_parameters = {"dataframe": df}
