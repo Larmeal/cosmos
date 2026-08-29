@@ -12,6 +12,12 @@ class ActionName(StrEnum):
     COPY = "copy"
 
 
+class Severity(StrEnum):
+    CRITICAL = "critical"
+    WARNING = "warning"
+    INFO = "info"
+
+
 class SourceObjectMetadata(BaseModel):
     """Resolved reality for one source object: where it is, how big, how old.
 
@@ -31,8 +37,13 @@ class SourceObjectMetadata(BaseModel):
 
 
 class ExpectationResult(BaseModel):
-    """
-    A class to hold the result of an expectation check, including the expectation name, result, and source object metadata.
+    """The outcome of one expectation against one source object — one row in the report.
+
+    Filled by ``gx/`` and never touched again. The fields promoted out of GX's
+    nested dicts are exactly the ones something outside ``gx/`` reads: ``severity``
+    and ``success`` drive the policy decision, the rest become report columns.
+    ``exception_message`` is separate from ``success`` on purpose — a rule GX could
+    not run is not a rule that passed.
     """
 
     success: bool = Field(description="Indicates whether the expectation was met.")
@@ -47,7 +58,8 @@ class ExpectationResult(BaseModel):
         default=None,
         description="A human-readable description of the expectation.",
     )
-    severity: Literal["critical", "warning", "info"] = Field(
+    severity: Severity = Field(
+        default=Severity.CRITICAL,
         description=(
             "The severity level if this expectation fails. 'critical' triggers the failure action, 'warning' and 'info' are recorded only."
         ),
@@ -72,11 +84,11 @@ class ExpectationResult(BaseModel):
         default=None,
         description="The list of unexpected values found by the expectation, if applicable.",
     )
-    unexpected_index_list: list[int] | None = Field(
+    unexpected_index: list[int] | None = Field(
         default=None,
         description="The list of indices of unexpected elements found by the expectation, if applicable.",
     )
-    raised_exception: str | None = Field(
+    exception_message: str | None = Field(
         default=None,
         description="The exception raised during the expectation check, if applicable.",
     )
@@ -91,8 +103,12 @@ class ExpectationResult(BaseModel):
 
 
 class ActionResult(BaseModel):
-    """
-    A class to hold the result of an action taken after a validation operation, including the action result and source object metadata.
+    """What was done to the source object, and whether it worked.
+
+    Written twice: ``status`` is ``pending`` when the report records the intent,
+    then the same instance is updated once the action has run and the report is
+    merged onto the same row. A row left at ``pending`` means the process died
+    between the two, so this model is deliberately mutable.
     """
 
     action: ActionName = Field(description="The name of the action that was taken.")
@@ -110,8 +126,14 @@ class ActionResult(BaseModel):
 
 
 class SourceObjectResult(BaseModel):
-    """
-    A class to hold the result of a validation operation on a source object, including the validation result and source object metadata.
+    """Everything that happened to one source object.
+
+    Accretes across the run rather than being built at once — the planner supplies
+    ``source_object``, the reader the counts and timings, ``gx/`` the expectations,
+    the policy the decision, the action its outcome. Most fields are therefore
+    optional because they are genuinely unknown at construction, not from laxity:
+    an object that could not be read has no ``row_count`` and no expectations, yet
+    still has to be recorded and dead-lettered.
     """
 
     status: Literal["completed", "aborted"] = Field(description="The status of the validation operation.")
@@ -124,8 +146,8 @@ class SourceObjectResult(BaseModel):
     column_count: int | None = Field(
         default=None, description="The number of columns processed during the validation operation."
     )
-    read_duration: float | None = Field(default=None, description="The duration of the read operation in seconds.")
-    validation_duration: float | None = Field(
+    read_duration_sec: float | None = Field(default=None, description="The duration of the read operation in seconds.")
+    validation_duration_sec: float | None = Field(
         default=None, description="The duration of the validation operation in seconds."
     )
     error_type: str | None = Field(
@@ -156,8 +178,11 @@ class SourceObjectResult(BaseModel):
 
 
 class CosmosResult(BaseModel):
-    """
-    A class to hold the result of a Cosmos operation, including the validation result and source object metadata.
+    """The result of one run — what the library returns and what the sinks write.
+
+    The reasoning a CLI exit code cannot carry: which objects were checked, what was
+    decided about each, and what was done to them. Run-level verdicts are summaries
+    of ``results`` and nothing else decides them.
     """
 
     validation_id: str = Field(description="The unique identifier for the validation operation.")
@@ -165,10 +190,22 @@ class CosmosResult(BaseModel):
     attempt: int = Field(description="The attempt number for the specific run of the Cosmos operation.")
     run_id: str = Field(description="The unique identifier for the specific run of the Cosmos operation.")
     run_ts: datetime.datetime = Field(description="The timestamp of the specific run of the Cosmos operation.")
-    results: list[SourceObjectResult] = Field(description="The result of the validation operation.")
+    results: list[SourceObjectResult] = Field(
+        description=(
+            "One entry per source object the planner resolved. Every planned object ends up here "
+            "whether it validated or aborted, so an empty list means the glob matched nothing."
+        )
+    )
 
     run_status: Literal["completed", "partial", "aborted"] = Field(
-        description="The status of the specific run of the Cosmos operation. rollup of results[].status values. If all are 'completed', then 'success'; if some are 'completed' and some are 'partial', then 'partial'; if any are 'aborted', then 'aborted'."
+        description=(
+            "Did COSMOS manage to do its job — a rollup of results[].status, which is only "
+            "'completed' or 'aborted' per object. Empty results: 'completed', because the glob "
+            "matched nothing and source.on_empty allowed it. All completed: 'completed'. "
+            "All aborted: 'aborted', which is systemic and should be louder than 'partial'. "
+            "Otherwise 'partial'. Answers a different question from data_decision: this one is "
+            "read by whoever runs the pipeline, that one by whoever owns the data."
+        )
     )
     data_decision: Literal["pass", "warn", "fail"] | None = Field(
         default=None,
