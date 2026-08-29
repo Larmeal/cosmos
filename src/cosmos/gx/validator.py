@@ -24,36 +24,16 @@ class GXValidator:
     def __init__(self, config: GXConfig) -> None:
         self.context: EphemeralDataContext
         self.config: GXConfig = config
-        self._datasource_name = self.datasource_name
-        self._data_asset_name = self.data_asset_name
-        self._batch_definition_name = self.batch_definition_name
-        self._expectation_suite_name = self.expectation_suite_name
+        self._datasource_name = self.config.contract.datasource_name
+        self._data_asset_name = self.config.contract.data_asset_name
+        self._batch_definition_name = self.config.contract.batch_definition_name
+        self._expectation_suite_name = self.config.contract.expectation_suite_name
         self._expectation_suites = self.expectation_suites
-
-    @property
-    def datasource_name(self) -> str:
-        """Generates a default datasource name based on the data asset name."""
-        return f"{self.config.contract.datasource_name or self.config.contract.data_asset_name}_source"
-
-    @property
-    def data_asset_name(self) -> str:
-        """Generates a default data asset name based on the dataset name."""
-        return f"{self.config.contract.data_asset_name}_asset"
-
-    @property
-    def batch_definition_name(self) -> str:
-        """Generates a default batch definition name based on the data asset name."""
-        return f"{self.config.contract.batch_definition_name or self.config.contract.data_asset_name}_batch"
-
-    @property
-    def expectation_suite_name(self) -> str:
-        """Generates a default expectation suite name based on the data asset name."""
-        return f"{self.config.contract.expectation_suite_name or self.config.contract.data_asset_name}_suite"
 
     @property
     def expectation_suites(self) -> ExpectationSuite:
         """Constructs an ExpectationSuite from the GXConfig."""
-        suite = ExpectationSuite(name=self.expectation_suite_name)
+        suite = ExpectationSuite(name=self._expectation_suite_name)
         for exp_cfg in self.config.contract.expectations:
             suite.add_expectation_configuration(
                 ExpectationConfiguration(
@@ -93,10 +73,10 @@ class GXValidator:
         logger.info(f"Starting GX validation for dataset: {dataset}")
 
         self.context: EphemeralDataContext = self._get_context()
-        data_source = self.context.data_sources.add_pandas(name=self.datasource_name)
-        data_asset = data_source.add_dataframe_asset(name=self.data_asset_name)
+        data_source = self.context.data_sources.add_pandas(name=self._datasource_name)
+        data_asset = data_source.add_dataframe_asset(name=self._data_asset_name)
         batch_definition = data_asset.add_batch_definition_whole_dataframe(
-            name=self.batch_definition_name,
+            name=self._batch_definition_name,
         )
 
         batch_parameters = {"dataframe": df}

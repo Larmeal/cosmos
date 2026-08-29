@@ -1,6 +1,6 @@
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ExpectationConfig(BaseModel):
@@ -56,10 +56,6 @@ class ContractConfig(BaseModel):
         expectations: The rules to apply to every source object.
     """
 
-    description: str | None = Field(
-        default=None,
-        description="A description of the contract's purpose.",
-    )
     data_asset_name: str = Field(description="The name of the data asset.", alias="name")
     datasource_name: str | None = Field(
         default=None,
@@ -73,13 +69,20 @@ class ContractConfig(BaseModel):
         default=None,
         description="The name used to register the suite.",
     )
-    checkpoint_name: str | None = Field(
+    description: str | None = Field(
         default=None,
-        description="The name of the validation checkpoint.",
+        description="A description of the contract's purpose.",
     )
     expectations: list[ExpectationConfig] = Field(
         description="The nested expectation suite configuration containing all expectations."
     )
+
+    @model_validator(mode="after")
+    def _resolve_gx_names(self) -> Self:
+        self.datasource_name = self.datasource_name or f"{self.data_asset_name}_source"
+        self.batch_definition_name = self.batch_definition_name or f"{self.data_asset_name}_batch"
+        self.expectation_suite_name = self.expectation_suite_name or f"{self.data_asset_name}_suite"
+        return self
 
 
 class DataDocsConfig(BaseModel):
