@@ -112,7 +112,7 @@ class ActionResult(BaseModel):
     """
 
     action: ActionName = Field(description="The name of the action that was taken.")
-    status: Literal["pending", "succeeded", "failed", "skipped"] = Field(
+    status: Literal["succeeded", "failed", "skipped"] = Field(
         description="Indicates whether the action was successful."
     )
     dead_letter: str | None = Field(

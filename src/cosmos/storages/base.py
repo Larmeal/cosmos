@@ -5,7 +5,7 @@ from collections.abc import Iterable
 
 from pydantic import BaseModel
 
-from cosmos.result import SourceObjectMetadata
+from cosmos.results import SourceObjectMetadata
 
 
 class BaseStorage(BaseModel, ABC):
