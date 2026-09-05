@@ -1,6 +1,13 @@
+import hashlib
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
+
+_RESERVED_META_KEYS = frozenset(
+    {
+        "expectation_key",
+    }
+)
 
 
 class ExpectationConfig(BaseModel):
@@ -23,8 +30,9 @@ class ExpectationConfig(BaseModel):
         default_factory=dict,
         description="The keyword arguments passed to the expectation (e.g., {'column': 'id'}).",
     )
-    meta: dict[str, Any] | None = Field(
-        default=None,
+    meta: dict[str, Any] = Field(
+        default_factory=dict,
+        validate_default=True,
         description="Additional custom metadata for the expectation (e.g., {'data_quality_issue': 'completeness'}).",
     )
     notes: str | list[str] | None = Field(
@@ -45,6 +53,20 @@ class ExpectationConfig(BaseModel):
             "The severity level if this expectation fails. 'critical' triggers the failure action, 'warning' and 'info' are recorded only. Defaults to 'critical'."
         ),
     )
+
+    @computed_field
+    @property
+    def expectation_key(self) -> str:
+        return hashlib.sha256(f"{self.expectation_type}-{self.kwargs}".encode()).hexdigest()
+
+    @model_validator(mode="after")
+    def _reserved_meta_keys(self) -> Self:
+        # Ensure that reserved meta keys are not used in the meta dictionary
+        # For set type, Use '&' to find the intersection with the keys of the meta dictionary
+        if collision := _RESERVED_META_KEYS & self.meta.keys():
+            raise ValueError(f"meta key(s) {sorted(collision)} are reserved for COSMOS internal use")
+        self.meta.update({"expectation_key": self.expectation_key})
+        return self
 
 
 class ContractConfig(BaseModel):
