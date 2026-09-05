@@ -12,18 +12,58 @@ logger = logging.getLogger(__name__)
 
 
 class GXTranslateExpectationResult:
+    """Turns one GX validation result into COSMOS's own ``ExpectationResult`` rows.
+
+    This class is the proxy at the GX/COSMOS boundary: everything downstream of
+    ``translate()`` — policy, sinks, reports — works only with COSMOS's own
+    ``ExpectationResult`` model and never touches a GX object directly. That keeps
+    every GX-specific detail (its nested result dict shape, the ``partial_``-prefixed
+    keys, the fact that ``meta`` is the only field that survives a suite round trip)
+    confined to this one class. When GX changes its result schema in a future
+    version, the fix is a diff to ``translate()`` alone; nothing else in COSMOS has
+    to know or care that GX changed at all.
+
+    GX's result dict carries no COSMOS identifiers of its own — ``expectation_key``
+    only survives the round trip through ``expectation_config.meta`` (GX regenerates
+    its own ``id`` when a suite is added to a context, so that field can't be used).
+    ``translate()`` matches each GX result back to the ``ExpectationConfig`` that
+    produced it via that key, then rebuilds the fields COSMOS reports on — pulling
+    some straight from our own config (name, type, kwargs, description, severity)
+    and others from GX's result payload (success, counts, unexpected values).
+
+    Attributes:
+        validation_config: The expectations that were validated, used to look up
+            each GX result's declared name/description/severity by its key.
+        gx_result: The raw GX validation result (dict-like) for the whole suite.
+        cosmos_expectation_result: Populated by ``translate()``; empty until then.
+    """
+
     def __init__(self, validation_config: list[ExpectationConfig], gx_result: ExpectationSuiteValidationResult) -> None:
         self.validation_config = validation_config
         self.gx_result = gx_result
         self.cosmos_expectation_result: list[ExpectationResult] = []
 
     def _mapping_expectation_config(self, expectation_key: str) -> ExpectationConfig:
+        """Finds the ``ExpectationConfig`` that declared the given key.
+
+        Raises:
+            ValueError: No expectation in ``validation_config`` has this key —
+                the GX result doesn't correspond to this contract.
+        """
         for config in self.validation_config:
             if config.expectation_key == expectation_key:
                 return config
         raise ValueError(f"ExpectationConfig with key {expectation_key!r} not found.")
 
     def translate(self) -> list[ExpectationResult]:  # type: ignore
+        """Builds ``cosmos_expectation_result`` from ``gx_result``, one row per expectation.
+
+        Raises:
+            ValueError: ``gx_result`` has no ``results`` list, or one of its entries
+                is missing ``expectation_key`` in ``expectation_config.meta`` — the
+                latter means COSMOS's own meta injection didn't survive validation,
+                which is a framework bug rather than a user error.
+        """
 
         if not self.gx_result.get("results"):
             raise ValueError("No results found in the Great Expectations validation result.")
@@ -92,4 +132,5 @@ class GXTranslateExpectationResult:
             )
 
     def get_result(self) -> list[ExpectationResult]:
+        """Returns the rows built by ``translate()``, or an empty list if it hasn't run yet."""
         return self.cosmos_expectation_result
