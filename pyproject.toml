@@ -51,7 +51,7 @@ select = [
     "B",   # flake8-bugbear – likely bugs and design issues
     "ANN", # flake8-annotations – missing type hints
 ]
-ignore = ["UP015", "E501"]
+ignore = ["UP015", "E501", "ANN401"]
 
 [tool.ruff.format]
 quote-style = "double"
