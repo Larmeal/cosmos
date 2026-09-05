@@ -58,7 +58,7 @@ class ExpectationResult(BaseModel):
         default=None,
         description="A human-readable description of the expectation.",
     )
-    severity: Severity = Field(
+    severity: Severity | str = Field(
         default=Severity.CRITICAL,
         description=(
             "The severity level if this expectation fails. 'critical' triggers the failure action, 'warning' and 'info' are recorded only."
@@ -87,6 +87,10 @@ class ExpectationResult(BaseModel):
     unexpected_index: list[int] | None = Field(
         default=None,
         description="The list of indices of unexpected elements found by the expectation, if applicable.",
+    )
+    raised_exception: bool = Field(
+        default=False,
+        description="Indicates whether an exception was raised during the expectation check.",
     )
     exception_message: str | None = Field(
         default=None,
