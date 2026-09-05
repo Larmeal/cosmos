@@ -4,7 +4,9 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from great_expectations import ExpectationSuite
-from great_expectations.core.expectation_validation_result import ExpectationSuiteValidationResult
+from great_expectations.core.expectation_validation_result import (
+    ExpectationSuiteValidationResult,
+)
 from great_expectations.expectations.expectation_configuration import (
     ExpectationConfiguration,
 )
@@ -13,7 +15,9 @@ from great_expectations.expectations.metadata_types import FailureSeverity
 from cosmos.gx.models import GXConfig
 
 if TYPE_CHECKING:
-    from great_expectations.data_context.data_context.ephemeral_data_context import EphemeralDataContext
+    from great_expectations.data_context.data_context.ephemeral_data_context import (
+        EphemeralDataContext,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -61,22 +65,22 @@ class GXValidator:
             case _:
                 return FailureSeverity.CRITICAL
 
-    def _get_context(self) -> Any:  # noqa: ANN401
+    def _get_context(self) -> EphemeralDataContext:
         """Initializes and returns a GX context."""
         from great_expectations import get_context
 
         return get_context(mode="ephemeral")
 
-    def validate(self, df: Any) -> ExpectationSuiteValidationResult:  # noqa: ANN401
+    def validate(self, df: Any) -> ExpectationSuiteValidationResult:
         """Validates the DataFrame and returns the result dictionary."""
         dataset = self.config.contract.data_asset_name
         logger.info(f"Starting GX validation for dataset: {dataset}")
 
-        self.context: EphemeralDataContext = self._get_context()
+        self.context = self._get_context()
         data_source = self.context.data_sources.add_pandas(name=self._datasource_name)
         data_asset = data_source.add_dataframe_asset(name=self._data_asset_name)
         batch_definition = data_asset.add_batch_definition_whole_dataframe(
-            name=self._batch_definition_name,  # type: ignore - Never None value
+            name=self._batch_definition_name,  # type: ignore
         )
 
         batch_parameters = {"dataframe": df}
