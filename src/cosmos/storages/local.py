@@ -42,7 +42,7 @@ class LocalStorage(BaseStorage):
             The full destination path, which does not exist yet.
 
         Raises:
-            OSError: If the directory cannot be created — most often
+            OSError: If the directory cannot be created, most often
                 ``PermissionError``, or ``NotADirectoryError`` when a file
                 already occupies the path.
         """
@@ -66,7 +66,7 @@ class LocalStorage(BaseStorage):
     def _to_metadata(self, entry: Path) -> SourceObjectMetadata:
         """Read size and mtime from a single ``os.stat`` call.
 
-        The path is kept exactly as the glob produced it — not resolved — so it
+        The path is kept exactly as the glob produced it (not resolved), so it
         matches the ``source_object`` key the report is written under.
 
         Raises:
@@ -90,7 +90,7 @@ class LocalStorage(BaseStorage):
         Note:
             The destination keeps the source's file name, so moving
             ``2026-08-15/orders.csv`` and ``2026-08-16/orders.csv`` into the same
-            directory leaves only the second — silently, on both Windows and
+            directory leaves only the second, silently, on both Windows and
             POSIX. Callers that dead-letter files from more than one directory
             should pass a distinct ``dst_dir`` per run.
 
@@ -140,7 +140,7 @@ class LocalStorage(BaseStorage):
 
         A re-run after a crash mid-action can find the file deleted by the
         previous attempt. Raising there would abort a run over something already
-        in the state it was asked to reach, so absence is logged and accepted —
+        in the state it was asked to reach, so absence is logged and accepted:
         the report is what records whether the first attempt got this far.
 
         Args:

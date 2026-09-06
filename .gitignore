@@ -214,5 +214,5 @@ __marimo__/
 .claude/settings*
 tmp*
 
-# Working notes — not a repo artifact
+# Working notes, not a repo artifact
 PROJECT_SUMMARY.md

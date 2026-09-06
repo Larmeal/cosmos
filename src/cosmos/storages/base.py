@@ -11,7 +11,7 @@ from cosmos.results import SourceObjectMetadata
 class BaseStorage(BaseModel, ABC):
     """Interface for file operations on a storage backend.
 
-    One subclass per backend — local disk, GCS, S3 — each implemented with that
+    One subclass per backend (local disk, GCS, S3), each implemented with that
     backend's own SDK. ``glob`` resolves a source pattern into the files a run
     will process, each with the size and mtime the planner renders; ``move``,
     ``copy`` and ``delete`` relocate or remove a file after validation fails.
@@ -19,7 +19,7 @@ class BaseStorage(BaseModel, ABC):
     Reading is not part of this interface: engines read by URI with their own
     readers.
 
-    Paths are URIs in whatever form the backend uses — filesystem paths for local
+    Paths are URIs in whatever form the backend uses: filesystem paths for local
     storage, ``gs://bucket/key`` for GCS.
     """
 
@@ -27,7 +27,7 @@ class BaseStorage(BaseModel, ABC):
         """Resolve a pattern into the objects it matches, metadata included.
 
         Template method: the shape of the result is fixed here so every backend
-        agrees on it — sorted by ``path`` for a reproducible processing order,
+        agrees on it: sorted by ``path`` for a reproducible processing order,
         directories never present. Backends supply the two halves: ``_list_files``
         walks the backend, ``_to_metadata`` turns one native entry into a
         ``SourceObjectMetadata``.
@@ -50,7 +50,7 @@ class BaseStorage(BaseModel, ABC):
         """Yield one backend-native entry per matching file.
 
         Directories are excluded here, not downstream. The entry type is the
-        backend's own — a ``Path`` for local disk, a ``Blob`` for GCS — and is
+        backend's own (a ``Path`` for local disk, a ``Blob`` for GCS) and is
         only ever consumed by this backend's ``_to_metadata``, which narrows it.
         """
 
@@ -59,8 +59,8 @@ class BaseStorage(BaseModel, ABC):
         """Map one entry from ``_list_files`` to a ``SourceObjectMetadata``.
 
         Must populate ``path``, ``size_bytes`` and ``modified``. The entry already
-        carries what is needed — a GCS ``Blob`` from a listing has ``size`` and
-        ``updated`` on it — so this never issues another request.
+        carries what is needed (a GCS ``Blob`` from a listing has ``size`` and
+        ``updated`` on it), so this never issues another request.
         """
 
     @abstractmethod
