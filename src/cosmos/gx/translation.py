@@ -55,7 +55,7 @@ class GXTranslateExpectationResult:
                 return config
         raise ValueError(f"ExpectationConfig with key {expectation_key!r} not found.")
 
-    def translate(self) -> list[ExpectationResult]:  # type: ignore
+    def translate(self) -> None:
         """Builds ``cosmos_expectation_result`` from ``gx_result``, one row per expectation.
 
         Raises:

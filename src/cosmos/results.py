@@ -1,6 +1,6 @@
 import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -10,6 +10,30 @@ class ActionName(StrEnum):
     DELETE = "delete"
     MOVE = "move"
     COPY = "copy"
+
+
+class ActionStatus(StrEnum):
+    PENDING = "pending"
+    SKIPPED = "skipped"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Decision(StrEnum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class RunStatus(StrEnum):
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    ABORTED = "aborted"
+
+
+class RunObjectStatus(StrEnum):
+    COMPLETED = "completed"
+    ABORTED = "aborted"
 
 
 class Severity(StrEnum):
@@ -127,9 +151,7 @@ class ActionResult(BaseModel):
     """
 
     action: ActionName = Field(description="The name of the action that was taken.")
-    status: Literal["succeeded", "failed", "skipped"] = Field(
-        description="Indicates whether the action was successful."
-    )
+    status: ActionStatus = Field(description="Indicates the status of the action.")
     dead_letter: str | None = Field(
         default=None,
         description="The directory path where the file should be moved/copied or where metadata should be saved.",
@@ -151,7 +173,7 @@ class SourceObjectResult(BaseModel):
     still has to be recorded and dead-lettered.
     """
 
-    status: Literal["completed", "aborted"] = Field(description="The status of the validation operation.")
+    status: RunObjectStatus = Field(description="The status of the validation operation.")
     source_object: SourceObjectMetadata = Field(
         description="The identifier or name of the source object being validated."
     )
@@ -173,7 +195,7 @@ class SourceObjectResult(BaseModel):
         default=None,
         description="The error message associated with the error that occurred during the validation operation, if any.",
     )
-    decision: Literal["pass", "warn", "fail"] | None = Field(
+    decision: Decision | None = Field(
         default=None,
         description="The decision made based on the validation results, if any.",
     )
@@ -211,8 +233,7 @@ class CosmosResult(BaseModel):
             "whether it validated or aborted, so an empty list means the glob matched nothing."
         )
     )
-
-    run_status: Literal["completed", "partial", "aborted"] = Field(
+    run_status: RunStatus = Field(
         description=(
             "Did COSMOS manage to do its job: a rollup of results[].status, which is only "
             "'completed' or 'aborted' per object. Empty results: 'completed', because the glob "
@@ -222,7 +243,7 @@ class CosmosResult(BaseModel):
             "read by whoever runs the pipeline, that one by whoever owns the data."
         )
     )
-    data_decision: Literal["pass", "warn", "fail"] | None = Field(
+    decision: Decision | None = Field(
         default=None,
         description="The overall data decision based on the validation results, if any.",
     )
