@@ -31,7 +31,7 @@ COSMOS operationalizes [Great Expectations](https://greatexpectations.io/): it m
 dispatches across engines, decides what happens when validation fails, and reports results to
 pluggable sinks.
 
-It is a **layer inside** someone else's pipeline (Airflow / Dagster / a script) — not a pipeline, not
+It is a **layer inside** someone else's pipeline (Airflow / Dagster / a script), not a pipeline, not
 a scheduler, not an ETL tool. It is built for **automated systems that run daily and report on data
 processing**, rather than for people exploring data interactively.
 
@@ -55,24 +55,24 @@ Source ──[ Engine ]────►┤                  ├────► Si
                           Policy ──► Action on the Source
 ```
 
-Both verbs share one pipe — same source reading, same engine, same sink. Profiling never fails, so
+Both verbs share one pipe: same source reading, same engine, same sink. Profiling never fails, so
 only validation can trigger an action on the source file.
 
 ## Features
 
 - **One YAML file per pipeline**, parsed and validated by Pydantic. A typo fails at load, not ten
   minutes into a run.
-- **Per-expectation severity** — `critical` / `warning` / `info`. Severity is what decides whether
+- **Per-expectation severity**: `critical` / `warning` / `info`. Severity is what decides whether
   the pipeline acts, rather than a bare pass/fail.
-- **Failure actions on the source file** — `ignore`, `move`, `copy`, `delete`, performed by the
+- **Failure actions on the source file**: `ignore`, `move`, `copy`, `delete`, performed by the
   storage system that owns the data (GCS moves its own objects; the OS moves local files).
 - **A report is always written**, independently of the file action, so "write to BigQuery *and* move
   the file" is expressible. The report is written *before* the file is touched.
 - **One file = one batch**, so a result can always name the file it came from.
-- **A two-class error taxonomy that decides retryability** — `ConfigError` aborts the run, and
+- **A two-class error taxonomy that decides retryability**: `ConfigError` aborts the run, and
   `DataError` dead-letters one origin. Anything else is fatal by construction: it propagates with
   nothing touched, so a network blip cannot quarantine healthy files.
-- **Partial failure continues** — a bad file is skipped and recorded; the remaining files still run.
+- **Partial failure continues**: a bad file is skipped and recorded; the remaining files still run.
 - **Library first, CLI second.** The library returns the reasoning; the CLI wraps it.
 
 ```yaml
@@ -101,8 +101,8 @@ on_failure:
 ## Not in scope
 
 Scheduling · writing validated data out (ETL) · data catalog / lineage · alerting (the orchestrator's
-`on_failure_callback` does it better) · exploratory data analysis · a drift platform — the
-time-series table plus SQL views is the answer · an in-house expectation vocabulary, since GX
+`on_failure_callback` does it better) · exploratory data analysis · a drift platform (the
+time-series table plus SQL views is the answer) · an in-house expectation vocabulary, since GX
 expectation names pass through unchanged.
 
 ## Roadmap
@@ -110,8 +110,8 @@ expectation names pass through unchanged.
 | | Ships |
 |---|---|
 | **v0.1** | pandas · local · validate · `action: ignore\|move` · JSON sink · library API · error taxonomy |
-| **v0.2** | GCS — source and dead-letter |
-| **v0.3** | BigQuery sink · `run_id` / `attempt_id` · `merge` — first production-usable version |
+| **v0.2** | GCS: source and dead-letter |
+| **v0.3** | BigQuery sink · `run_id` / `attempt_id` · `merge`, first production-usable version |
 | **v0.4** | profiling + drift SQL views |
 | **v0.5** | Jinja · contract reuse · CLI |
 | **v0.6** | Spark |

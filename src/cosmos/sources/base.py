@@ -43,7 +43,7 @@ class FileBaseConfig(BaseConfig):
             "'nothing arrived today, which is normal' apart from 'the upstream job did not run', "
             "so the declaration has to say which one it is. A report is written either way. "
             "This is a run-level event and has nothing to do with a file that is found but holds "
-            "zero rows — that is recorded on the source object as a warning."
+            "zero rows: that is recorded on the source object as a warning."
         ),
     )
     options: dict[str, Any] = Field(

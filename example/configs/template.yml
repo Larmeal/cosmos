@@ -1,4 +1,4 @@
-# COSMOS configuration — annotated reference
+# COSMOS configuration: annotated reference
 #
 # Every field is shown here with its allowed values. Fields marked [v0.x] are not
 # available yet; see PROJECT_SUMMARY.md for the roadmap.
@@ -17,7 +17,7 @@ id: customer_daily
 engine: pandas                        # pandas | spark [v0.6] | sql [v0.7]
 
 # ---------------------------------------------------------------------------
-# Source — where the data comes from
+# Source: where the data comes from
 # ---------------------------------------------------------------------------
 
 source:
@@ -34,7 +34,7 @@ source:
     delimiter: ","
     encoding: utf-8
 
-# A table source instead of files [v0.7] — note it has no file_path or
+# A table source instead of files [v0.7]: note it has no file_path or
 # file_format, and no file actions are available:
 #
 # source:
@@ -90,17 +90,17 @@ validate:
 
   # An HTML view of the results, rendered by Great Expectations. Off by default:
   # nothing is written and no directory is created. COSMOS's own reports under
-  # `report:` are the source of truth — this is only for humans who want to
+  # `report:` are the source of truth, this is only for humans who want to
   # browse results.
   data_docs:
     enabled: false
     # store: output/data_docs/
 
 # ---------------------------------------------------------------------------
-# Failure handling — what happens to the source file
+# Failure handling: what happens to the source file
 # ---------------------------------------------------------------------------
 
-# A report is ALWAYS written — it is not one of these choices. These control
+# A report is ALWAYS written: it is not one of these choices. These control
 # only what happens to the file itself.
 #
 # This sits beside `validate:` rather than inside it because it also fires for a
@@ -112,7 +112,7 @@ on_failure:
   dead_letter: output/dead-letters/
 
 # ---------------------------------------------------------------------------
-# Profiling [v0.4] — descriptive statistics recorded over time
+# Profiling [v0.4]: descriptive statistics recorded over time
 # ---------------------------------------------------------------------------
 
 profile:
@@ -123,7 +123,7 @@ profile:
     rows: 100000
 
 # ---------------------------------------------------------------------------
-# Reporting — always written, for both validate and profile
+# Reporting: always written, for both validate and profile
 # ---------------------------------------------------------------------------
 
 report:
@@ -131,7 +131,7 @@ report:
     path: output/reports/
 
   # [v0.3]
-  # One row per expectation, per origin, per run — an append-only time series.
+  # One row per expectation, per origin, per run: an append-only time series.
   # Drift detection is then an ordinary SQL query over this table.
   - type: bigquery
     project: my-project

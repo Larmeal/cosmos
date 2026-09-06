@@ -15,7 +15,7 @@ class GXTranslateExpectationResult:
     """Turns one GX validation result into COSMOS's own ``ExpectationResult`` rows.
 
     This class is the proxy at the GX/COSMOS boundary: everything downstream of
-    ``translate()`` — policy, sinks, reports — works only with COSMOS's own
+    ``translate()`` (policy, sinks, reports) works only with COSMOS's own
     ``ExpectationResult`` model and never touches a GX object directly. That keeps
     every GX-specific detail (its nested result dict shape, the ``partial_``-prefixed
     keys, the fact that ``meta`` is the only field that survives a suite round trip)
@@ -23,11 +23,11 @@ class GXTranslateExpectationResult:
     version, the fix is a diff to ``translate()`` alone; nothing else in COSMOS has
     to know or care that GX changed at all.
 
-    GX's result dict carries no COSMOS identifiers of its own — ``expectation_key``
+    GX's result dict carries no COSMOS identifiers of its own: ``expectation_key``
     only survives the round trip through ``expectation_config.meta`` (GX regenerates
     its own ``id`` when a suite is added to a context, so that field can't be used).
     ``translate()`` matches each GX result back to the ``ExpectationConfig`` that
-    produced it via that key, then rebuilds the fields COSMOS reports on — pulling
+    produced it via that key, then rebuilds the fields COSMOS reports on, pulling
     some straight from our own config (name, type, kwargs, description, severity)
     and others from GX's result payload (success, counts, unexpected values).
 
@@ -47,8 +47,8 @@ class GXTranslateExpectationResult:
         """Finds the ``ExpectationConfig`` that declared the given key.
 
         Raises:
-            ValueError: No expectation in ``validation_config`` has this key —
-                the GX result doesn't correspond to this contract.
+            ValueError: No expectation in ``validation_config`` has this key,
+                meaning the GX result doesn't correspond to this contract.
         """
         for config in self.validation_config:
             if config.expectation_key == expectation_key:
@@ -60,7 +60,7 @@ class GXTranslateExpectationResult:
 
         Raises:
             ValueError: ``gx_result`` has no ``results`` list, or one of its entries
-                is missing ``expectation_key`` in ``expectation_config.meta`` — the
+                is missing ``expectation_key`` in ``expectation_config.meta``. The
                 latter means COSMOS's own meta injection didn't survive validation,
                 which is a framework bug rather than a user error.
         """
@@ -79,7 +79,7 @@ class GXTranslateExpectationResult:
                 raise ValueError(
                     "Missing 'expectation_key' in the GX result's 'expectation_config.meta'. COSMOS "
                     "always injects this key into the expectation's meta before validation, so its "
-                    "absence here means Great Expectations did not echo it back as expected — this is "
+                    "absence here means Great Expectations did not echo it back as expected, which is "
                     "a bug in the COSMOS framework, please report it to the maintainers."
                 )
             expectation_config: ExpectationConfig = self._mapping_expectation_config(expectation_key)

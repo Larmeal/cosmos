@@ -43,5 +43,5 @@ class GCSSourceConfig(FileBaseConfig):
 
     @cached_property
     def backend(self) -> StorageBackend:
-        """Not available yet — GCS storage lands in v0.2."""
+        """Not available yet: GCS storage lands in v0.2."""
         raise NotImplementedError("GCS storage is not implemented yet; it lands in v0.2.")

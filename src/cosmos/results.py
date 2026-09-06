@@ -13,6 +13,17 @@ class ActionName(StrEnum):
 
 
 class Severity(StrEnum):
+    """COSMOS's own mirror of GX's ``FailureSeverity``: same three levels, no GX import.
+
+    Building a GX expectation suite requires a ``FailureSeverity`` value (from
+    ``great_expectations.expectations.metadata_types``), but ``results.py`` is a
+    leaf module that must import nothing of ours and nothing of GX's, so every
+    other module can depend on it without dragging ``great_expectations`` in
+    transitively. Declaring an equivalent enum here instead keeps that boundary
+    intact; ``gx/validator.py``'s ``_map_severity`` is the only place that
+    translates between the two.
+    """
+
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -21,13 +32,13 @@ class Severity(StrEnum):
 class SourceObjectMetadata(BaseModel):
     """Resolved reality for one source object: where it is, how big, how old.
 
-    Produced by ``storage.glob`` — every backend fills the same three required
+    Produced by ``storage.glob``: every backend fills the same three required
     fields from its own listing, so a missing one fails at construction rather
     than surfacing as a hole in the report. ``metadata`` is a backend-specific
     bag that nothing downstream interprets.
     """
 
-    path: str = Field(description="Full URI of the source object — the report's source_object key.")
+    path: str = Field(description="Full URI of the source object, the report's source_object key.")
     size_bytes: int = Field(description="Object size in bytes, from the listing.")
     modified: datetime.datetime = Field(description="Last-modified time (UTC), from the listing.")
     metadata: dict[str, Any] = Field(
@@ -37,12 +48,12 @@ class SourceObjectMetadata(BaseModel):
 
 
 class ExpectationResult(BaseModel):
-    """The outcome of one expectation against one source object — one row in the report.
+    """The outcome of one expectation against one source object: one row in the report.
 
     Filled by ``gx/`` and never touched again. The fields promoted out of GX's
     nested dicts are exactly the ones something outside ``gx/`` reads: ``severity``
     and ``success`` drive the policy decision, the rest become report columns.
-    ``exception_message`` is separate from ``success`` on purpose — a rule GX could
+    ``exception_message`` is separate from ``success`` on purpose: a rule GX could
     not run is not a rule that passed.
     """
 
@@ -132,7 +143,7 @@ class ActionResult(BaseModel):
 class SourceObjectResult(BaseModel):
     """Everything that happened to one source object.
 
-    Accretes across the run rather than being built at once — the planner supplies
+    Accretes across the run rather than being built at once: the planner supplies
     ``source_object``, the reader the counts and timings, ``gx/`` the expectations,
     the policy the decision, the action its outcome. Most fields are therefore
     optional because they are genuinely unknown at construction, not from laxity:
@@ -182,7 +193,7 @@ class SourceObjectResult(BaseModel):
 
 
 class CosmosResult(BaseModel):
-    """The result of one run — what the library returns and what the sinks write.
+    """The result of one run: what the library returns and what the sinks write.
 
     The reasoning a CLI exit code cannot carry: which objects were checked, what was
     decided about each, and what was done to them. Run-level verdicts are summaries
@@ -203,7 +214,7 @@ class CosmosResult(BaseModel):
 
     run_status: Literal["completed", "partial", "aborted"] = Field(
         description=(
-            "Did COSMOS manage to do its job — a rollup of results[].status, which is only "
+            "Did COSMOS manage to do its job: a rollup of results[].status, which is only "
             "'completed' or 'aborted' per object. Empty results: 'completed', because the glob "
             "matched nothing and source.on_empty allowed it. All completed: 'completed'. "
             "All aborted: 'aborted', which is systemic and should be louder than 'partial'. "

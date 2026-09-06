@@ -26,7 +26,7 @@ class DataError(CosmosError):
     rather than to the environment.
 
     The source object is recorded and dead-lettered according to ``on_failure``, and the
-    run continues with the remaining source objects — a partial run that is recorded
+    run continues with the remaining source objects: a partial run that is recorded
     beats an aborted one that leaves the day missing from the report.
     """
 
