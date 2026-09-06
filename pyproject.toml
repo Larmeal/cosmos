@@ -30,6 +30,7 @@ dev = [
     "pendulum>=3.2.0",
     "prek>=0.3.8",
     "pytest>=8",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.7",
 ]
 docs = [
@@ -64,3 +65,16 @@ version_scheme = "pep440"
 version_provider = "uv"
 update_changelog_on_bump = true
 major_version_zero = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+
+markers = [
+    "integration: needs real GCS/BigQuery or Spark; exclude with -m \"not integration\"",
+]
