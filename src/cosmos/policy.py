@@ -1,3 +1,5 @@
+from typing import Self
+
 from cosmos.actions import IgnoreFailureAction, OnFailureActionConfig, RelocateFailureAction
 from cosmos.results import ActionName, ActionResult, ActionStatus, Decision, ExpectationResult, Severity
 
@@ -61,7 +63,7 @@ class Policy:
             return Decision.WARN
         return Decision.PASS
 
-    def decide(self, expectation_results: list[ExpectationResult]) -> None:
+    def decide(self, expectation_results: list[ExpectationResult]) -> Self:
         """Works out the verdict and the action, and stores both on the instance.
 
         Nothing is read, written or relocated here. Once this returns,
@@ -94,3 +96,4 @@ class Policy:
                 dead_letter=None,
                 error=None,
             )
+        return self

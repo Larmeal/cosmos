@@ -1,8 +1,11 @@
 import datetime
 from enum import StrEnum
+from importlib.metadata import version
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+_COSMOS_VERSION = version("cosmos")
 
 
 class ActionName(StrEnum):
@@ -223,7 +226,10 @@ class CosmosResult(BaseModel):
     """
 
     validation_id: str = Field(description="The unique identifier for the validation operation.")
-    cosmos_version: str = Field(description="The version of Cosmos used for the validation.")
+    cosmos_version: str = Field(
+        default=_COSMOS_VERSION,
+        description="The version of Cosmos used for the validation.",
+    )
     attempt: int = Field(description="The attempt number for the specific run of the Cosmos operation.")
     run_id: str = Field(description="The unique identifier for the specific run of the Cosmos operation.")
     run_ts: datetime.datetime = Field(description="The timestamp of the specific run of the Cosmos operation.")
@@ -244,6 +250,5 @@ class CosmosResult(BaseModel):
         )
     )
     decision: Decision | None = Field(
-        default=None,
         description="The overall data decision based on the validation results, if any.",
     )
