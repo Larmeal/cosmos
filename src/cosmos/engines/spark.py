@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from cosmos.engines.base import BaseEngine
 
@@ -13,5 +14,5 @@ class SparkEngine(BaseEngine):
 
     engine: Literal["spark"]
 
-    def load_data(self) -> None | DataFrame:
+    def load_data(self, file_path: str | Path, **options: Any) -> None | DataFrame:
         pass

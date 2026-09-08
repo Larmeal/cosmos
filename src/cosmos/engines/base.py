@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -49,7 +49,7 @@ class BaseEngine(BaseModel, ABC):
         return self
 
     @abstractmethod
-    def load_data(self) -> pd.DataFrame | SparkDataFrame | None:
+    def load_data(self, file_path: str, **options: Any) -> pd.DataFrame | SparkDataFrame | None:
         """Load data from the specified source.
 
         This method should be implemented by subclasses to handle the specific

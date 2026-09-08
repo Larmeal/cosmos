@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from cosmos.engines.base import BaseEngine
 
@@ -13,12 +14,12 @@ class PandasEngine(BaseEngine):
 
     engine: Literal["pandas"]
 
-    def load_data(self) -> pd.DataFrame:
+    def load_data(self, file_path: str | Path, **options: Any) -> pd.DataFrame:
         import pandas as pd
 
         match self.source.file_format:
             case "csv":
-                df = pd.read_csv(self.source.file_path, **self.source.options)
+                df = pd.read_csv(file_path, **options)
                 return df
             case _:
                 raise ValueError(f"Unsupported source type: {self.source.file_format}")
