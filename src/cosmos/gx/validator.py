@@ -47,7 +47,8 @@ class GXValidator:
                     notes=exp_cfg.notes,
                     description=exp_cfg.description,
                     severity=self._map_severity(exp_cfg.severity),
-                )
+                ),
+                match_type="success",
             )
         return suite
 
