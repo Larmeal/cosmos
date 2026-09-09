@@ -42,6 +42,8 @@ processing**, rather than for people exploring data interactively.
 | **Failure lifecycle** | GX reports that a batch failed; it will not move the offending file to a dead-letter location or record what happened. COSMOS does both. |
 | **Multi-engine dispatch** | One declarative YAML shape running on pandas, Spark or SQL. |
 | **Profiling** | GX 1.x substantially pared back the profiling story that existed in 0.x. |
+| **Retry safety** | Every report row carries `run_id`/`attempt_id` from the first release, so a retried run never writes a duplicate row, whatever the sink. |
+| **Version isolation** | GX is a permanent, load-bearing dependency, not a swap-out abstraction. It stays confined to one module (`gx/`), so a GX version bump is fixed in one place instead of leaking through the codebase. |
 
 ## How it works
 
@@ -74,6 +76,10 @@ only validation can trigger an action on the source file.
   nothing touched, so a network blip cannot quarantine healthy files.
 - **Partial failure continues**: a bad file is skipped and recorded; the remaining files still run.
 - **Library first, CLI second.** The library returns the reasoning; the CLI wraps it.
+- **Custom expectations**: subclass GX's own `Expectation`, register it, and it is just another
+  `expectation_type` string in the contract, no different from a built-in one.
+- **Config-driven editor autocomplete**: the JSON Schema handed to your editor is generated from the
+  same Pydantic models COSMOS validates with, so it can never drift from what the code actually accepts.
 
 ```yaml
 id: customer_daily
@@ -109,19 +115,18 @@ expectation names pass through unchanged.
 
 | | Ships |
 |---|---|
-| **v0.1** | pandas · local · validate · `action: ignore\|move` · JSON sink · library API · error taxonomy |
-| **v0.2** | GCS: source and dead-letter |
-| **v0.3** | BigQuery sink · `run_id` / `attempt_id` · `merge`, first production-usable version |
-| **v0.4** | profiling + drift SQL views |
-| **v0.5** | Jinja · contract reuse · CLI |
-| **v0.6** | Spark |
-| **v0.7** | SQL |
+| **v0.1** | pandas · local · CSV, end to end · `action: ignore\|move\|copy\|delete` · custom expectations · JSON sink · GX Data Docs · library API · error taxonomy · retry-safe reports |
+| **v0.2** | GCS · BigQuery sink · `merge` · checkpoint / resume |
+| **v0.3** | Jinja · contract reuse · CLI |
+| **v0.4** | Spark |
+| **v0.5** | SQL |
+| **v0.6** | profiling + drift SQL views |
 
 ## Status
 
-**Pre-v0.1 and under active construction.** The configuration layer, the GX adapter and local
-storage work; the planner, policy, report sinks and runner are not written yet, and the config shape
-is still settling. See [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for the full design record.
+**Pre-v0.1 and under active construction.** The configuration layer, the GX adapter, local storage,
+the planner and the policy work; report sinks don't write yet and the runner doesn't finish the loop
+(no action is executed, no result is returned).
 
 ## Development
 
