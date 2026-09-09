@@ -1,5 +1,3 @@
-from typing import Self
-
 from cosmos.actions import IgnoreFailureAction, OnFailureActionConfig, RelocateFailureAction
 from cosmos.results import ActionName, ActionResult, ActionStatus, Decision, ExpectationResult, Severity
 
@@ -13,11 +11,11 @@ class Policy:
         "was the data good?"       -> Decision.PASS / WARN / FAIL
         "what do we do about it?"  -> an ActionResult naming the action to perform
 
-    Severity is what connects the two. A failure matters only as much as the
-    contract said it should:
+    Severity connects the two: a failure matters only as much as the contract
+    said it should.
 
         a critical expectation failed  -> FAIL, and the configured on_failure
-                                          action fires (move, copy, delete)
+                                          action is planned (move, copy, delete)
         only warnings failed           -> WARN, the file is left where it is
         nothing failed, or only info   -> PASS, the file is left where it is
 
@@ -25,35 +23,34 @@ class Policy:
     report; they just do not move anything.
 
     Policy is a brain with no hands. It never opens a file, relocates one, or
-    writes a report. It produces the two verdicts above and hands them back, and
-    the runner is what performs the action and records how it went. That is what
-    lets this class be tested with nothing but a list of fabricated
+    writes a report, and it keeps no per-object state: ``decide()`` takes one
+    object's results and returns the verdicts rather than storing them, so one
+    instance is built per run and reused, unchanged, for every object in it.
+    That is what lets this class be tested with nothing but a list of fabricated
     ``ExpectationResult`` objects: no GX, no storage, no engine, no I/O.
 
-    It also looks at one source object at a time and never at its neighbours. The
-    run-level verdicts (``run_status``, ``data_decision``) are rollups computed
-    over every object after the loop finishes, not something Policy produces.
+    The ``ActionResult`` it returns is only an intent: status is ``PENDING`` for
+    an action that will run, ``SKIPPED`` when there is nothing to do. The report
+    records that intent before the runner acts, so a row still at ``PENDING``
+    afterwards means the process died in between.
+
+    Policy looks at one source object at a time, never at its neighbours. The
+    run-level verdicts (``run_status``, ``decision``) are rollups computed over
+    every object after the loop finishes, not something Policy produces.
 
     Attributes:
         on_failure_config: What the config said to do with a file that fails.
-        decision_result: Filled by ``decide()``, ``None`` until it runs.
-        action_result: Filled by ``decide()``, ``None`` until it runs. Its status
-            starts at ``PENDING`` because the report records the intent before the
-            action actually runs, so a row still sitting at ``PENDING`` afterwards
-            means the process died in between.
     """
 
     def __init__(self, on_failure_config: OnFailureActionConfig) -> None:
         self.on_failure_config = on_failure_config
-        self.decision_result: Decision | None = None
-        self.action_result: ActionResult | None = None
 
     def _make_decision(self, expectation_results: list[ExpectationResult]) -> Decision:
-        """Applies the severity rule to one object's expectation results.
+        """Reduces one object's expectation results to a verdict by worst severity.
 
-        Only failures are considered, and the worst severity among them wins. An
-        ``info`` expectation that fails changes nothing: it is recorded, but it
-        does not lift the verdict above ``PASS``.
+        Only failures count, and a failed ``info`` expectation never lifts the
+        verdict above ``PASS``: it is recorded, but it exists to leave a note for
+        a person, not to gate anything.
         """
         failures = [result for result in expectation_results if not result.success]
 
@@ -63,37 +60,50 @@ class Policy:
             return Decision.WARN
         return Decision.PASS
 
-    def decide(self, expectation_results: list[ExpectationResult]) -> Self:
-        """Works out the verdict and the action, and stores both on the instance.
+    def _plan_action(self, decision_result: Decision) -> ActionResult:
+        """Derives the unexecuted action from the verdict and ``on_failure_config``.
 
-        Nothing is read, written or relocated here. Once this returns,
-        ``decision_result`` and ``action_result`` hold the answers for the runner
-        to record and act on.
-
-        Args:
-            expectation_results: Every expectation checked against this one source
-                object, as produced by ``gx/``.
+        Only ``FAIL`` leads to a real action, and only when the config is not
+        ``IgnoreFailureAction``; every other case returns ``IGNORE`` / ``SKIPPED``
+        because nothing touches the file. The runner is what performs a
+        ``PENDING`` action and updates its status afterwards.
         """
-        self.decision_result = self._make_decision(expectation_results)
-        decision_result = self.decision_result
-
-        if isinstance(self.on_failure_config, RelocateFailureAction):
-            dead_letter = self.on_failure_config.dead_letter
-        else:
-            dead_letter = None
-
         if decision_result == Decision.FAIL and not isinstance(self.on_failure_config, IgnoreFailureAction):
-            self.action_result = ActionResult(
+            dead_letter = (
+                self.on_failure_config.dead_letter
+                if isinstance(self.on_failure_config, RelocateFailureAction)
+                else None
+            )
+            return ActionResult(
                 action=self.on_failure_config.action,
                 status=ActionStatus.PENDING,
                 dead_letter=dead_letter,
                 error=None,
             )
-        else:
-            self.action_result = ActionResult(
-                action=ActionName.IGNORE,
-                status=ActionStatus.SKIPPED,
-                dead_letter=None,
-                error=None,
-            )
-        return self
+
+        return ActionResult(
+            action=ActionName.IGNORE,
+            status=ActionStatus.SKIPPED,
+            dead_letter=None,
+            error=None,
+        )
+
+    def decide(self, expectation_results: list[ExpectationResult]) -> tuple[Decision, ActionResult]:
+        """Turns one source object's expectation results into its two verdicts.
+
+        This is the only method the rest of COSMOS calls; the two helpers exist
+        to support it. Nothing is read, written or relocated here. The runner
+        records the decision and then performs the action if one is due.
+
+        Args:
+            expectation_results: Every expectation checked against this one source
+                object, as produced by ``gx/``.
+
+        Returns:
+            The ``Decision`` for the object and the ``ActionResult`` the runner
+            should carry out. Neither is stored on ``self``.
+        """
+        decision_result = self._make_decision(expectation_results)
+        action_result = self._plan_action(decision_result)
+
+        return decision_result, action_result
