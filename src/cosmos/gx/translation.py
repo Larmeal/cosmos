@@ -38,10 +38,8 @@ class GXTranslateExpectationResult:
         cosmos_expectation_result: Populated by ``translate()``; empty until then.
     """
 
-    def __init__(self, validation_config: list[ExpectationConfig], gx_result: ExpectationSuiteValidationResult) -> None:
+    def __init__(self, validation_config: list[ExpectationConfig]) -> None:
         self.validation_config = validation_config
-        self.gx_result = gx_result
-        self.cosmos_expectation_result: list[ExpectationResult] = []
 
     def _mapping_expectation_config(self, expectation_key: str) -> ExpectationConfig:
         """Finds the ``ExpectationConfig`` that declared the given key.
@@ -55,7 +53,7 @@ class GXTranslateExpectationResult:
                 return config
         raise ValueError(f"ExpectationConfig with key {expectation_key!r} not found.")
 
-    def translate(self) -> None:
+    def translate(self, gx_result: ExpectationSuiteValidationResult) -> list[ExpectationResult]:
         """Builds ``cosmos_expectation_result`` from ``gx_result``, one row per expectation.
 
         Raises:
@@ -65,10 +63,11 @@ class GXTranslateExpectationResult:
                 which is a framework bug rather than a user error.
         """
 
-        if not self.gx_result.get("results"):
+        if not gx_result.get("results"):
             raise ValueError("No results found in the Great Expectations validation result.")
 
-        for result in self.gx_result.get("results"):  # type: ignore
+        cosmos_expectation_result: list[ExpectationResult] = []
+        for result in gx_result.get("results"):  # type: ignore
             result: dict
 
             expectation_config_data: dict[str, Any] | None = result.get("expectation_config")
@@ -91,7 +90,6 @@ class GXTranslateExpectationResult:
             severity = expectation_config.severity
 
             result_data: dict[str, Any] | None = result.get("result")
-            exception_info = result.get("exception_info")
 
             success: bool = result.get("success")  # type: ignore
             element_count: int | None = result_data.get("element_count") if result_data else None
@@ -103,13 +101,25 @@ class GXTranslateExpectationResult:
                 result_data.get("partial_unexpected_index_list") if result_data else None
             )
 
-            raised_exception: bool = exception_info.get("raised_exception") if exception_info else False
-            exception_message: str | None = exception_info.get("exception_message") if exception_info else None
+            if exception_info := result.get("exception_info"):
+                if "raised_exception" in exception_info:
+                    raised_exception: bool = exception_info.get("raised_exception")
+                    exception_message: str | None = exception_info.get("exception_message")
+                else:
+                    # NOTE: Have only one exception info dictionary, so we can directly extract the values.
+                    # If someday there are multiple exception info dictionaries,
+                    # this loop will store the last one encountered.
+                    for value in exception_info.values():
+                        raised_exception = value.get("raised_exception")
+                        exception_message = value.get("exception_message")
+            else:
+                raise ValueError("Exception info is missing from the result.")
+
             raw_notes: str | list[str] | None = (
                 expectation_config_data.get("notes") if expectation_config_data else None
             )
             notes: str | None = "\n".join(raw_notes) if isinstance(raw_notes, list) else raw_notes
-            self.cosmos_expectation_result.append(
+            cosmos_expectation_result.append(
                 ExpectationResult(
                     expectation_key=expectation_key,
                     expectation_name=expectation_name,
@@ -130,7 +140,4 @@ class GXTranslateExpectationResult:
                     notes=notes,
                 )
             )
-
-    def get_result(self) -> list[ExpectationResult]:
-        """Returns the rows built by ``translate()``, or an empty list if it hasn't run yet."""
-        return self.cosmos_expectation_result
+        return cosmos_expectation_result
