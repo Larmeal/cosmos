@@ -16,11 +16,8 @@ class BaseFailureAction(BaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
-    def handle(self) -> None:
+    def handle(self, src: str) -> None:
         """Perform the action on the source file."""
-
-    def execute(self) -> None:
-        return self.handle()
 
 
 class IgnoreFailureAction(BaseFailureAction):
@@ -35,7 +32,7 @@ class IgnoreFailureAction(BaseFailureAction):
         description="Action identifier, fixed to 'ignore'. The file is left untouched; the report is still written.",
     )
 
-    def handle(self) -> None:
+    def handle(self, src: str | None = None) -> None:
         """Do nothing to the source file."""
         return None
 
@@ -49,12 +46,18 @@ class DeleteFailureAction(BaseFailureAction):
         description="The storage backend to use for the action. If not provided, the storage backend will be inferred from the source configuration.",
     )
 
-    def handle(self) -> None:
+    def handle(self, src: str) -> None:
         """Handle the delete action.
 
         This method deletes the raw source file in-place using the provided storage backend.
         """
-        raise NotImplementedError("Subclasses must implement the handle method for relocation actions.")
+
+        if self.backend is not None:
+            self.backend.delete_obj(src=src)
+        else:
+            raise ValueError(
+                "No storage backend available to handle the `delete` action. Please provide a storage backend either in the `source` or `on_failure` configuration."
+            )
 
 
 class RelocateFailureAction(BaseFailureAction):
@@ -89,25 +92,23 @@ class RelocateFailureAction(BaseFailureAction):
 
         return cleaned_path
 
-    def handle(self) -> None:
-        """Handle the relocation action.
-
-        This method is intended to be overridden by subclasses that implement specific relocation actions.
-        """
-        raise NotImplementedError("Subclasses must implement the handle method for relocation actions.")
-
 
 class MoveFailureAction(RelocateFailureAction):
     """Configuration for moving the raw source file to a dead-letter directory."""
 
     action: Literal[ActionName.MOVE] = Field(description="Action identifier, fixed to 'move'.")
 
-    def handle(self) -> None:
+    def handle(self, src: str) -> None:
         """Handle the relocation action.
 
         This method is intended to be overridden by subclasses that implement specific relocation actions.
         """
-        raise NotImplementedError("Subclasses must implement the handle method for relocation actions.")
+        if self.backend is not None:
+            self.backend.move_obj(src=src, dst_dir=self.dead_letter)
+        else:
+            raise ValueError(
+                "No storage backend available to handle the `move` action. Please provide a storage backend either in the `source` or `on_failure` configuration."
+            )
 
 
 class CopyFailureAction(RelocateFailureAction):
@@ -115,12 +116,17 @@ class CopyFailureAction(RelocateFailureAction):
 
     action: Literal[ActionName.COPY] = Field(description="Action identifier, fixed to 'copy'.")
 
-    def handle(self) -> None:
+    def handle(self, src: str) -> None:
         """Handle the relocation action.
 
         This method is intended to be overridden by subclasses that implement specific relocation actions.
         """
-        raise NotImplementedError("Subclasses must implement the handle method for relocation actions.")
+        if self.backend is not None:
+            self.backend.copy_obj(src=src, dst_dir=self.dead_letter)
+        else:
+            raise ValueError(
+                "No storage backend available to handle the `copy` action. Please provide a storage backend either in the `source` or `on_failure` configuration."
+            )
 
 
 OnFailureActionConfig = Annotated[
