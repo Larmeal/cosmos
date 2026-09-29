@@ -124,6 +124,12 @@ class DataDocsConfig(BaseModel):
         description="The path where Data Docs will be stored. If not provided, a default path will be used.",
     )
 
+    @model_validator(mode="after")
+    def _validate_store_path_if_enabled(self) -> Self:
+        if self.enabled and not self.store_path:
+            raise ValueError("`store_path` must be provided if Data Docs generation is enabled.")
+        return self
+
 
 class GXConfig(BaseModel):
     """The `validate:` section of the configuration.
