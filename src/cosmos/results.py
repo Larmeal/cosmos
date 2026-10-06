@@ -9,6 +9,31 @@ _COSMOS_VERSION = version("cosmos")
 
 
 class ActionName(StrEnum):
+    """What COSMOS can do to a source file once ``on_failure`` decides to act.
+
+    Mirrors the ``action`` field of the ``on_failure`` config block one-to-one.
+    The YAML author picks one of these four, and ``policy.py`` copies that
+    same value onto the ``ActionResult`` it plans, unchanged.
+
+    Values:
+        IGNORE: Leave the file exactly where it is. Also the value
+            ``policy.py`` uses when nothing needs to happen at all, not only
+            when the user configured it explicitly.
+        DELETE: Remove the file from its source location.
+        MOVE: Relocate the file into ``dead_letter``, removing the original.
+        COPY: Copy the file into ``dead_letter``, leaving the original in place.
+
+    Example:
+        >>> ActionName.MOVE
+        <ActionName.MOVE: 'move'>
+
+        >>> ActionName.MOVE.value
+        'move'
+
+        >>> ActionName.MOVE == "move"
+        True
+    """
+
     IGNORE = "ignore"
     DELETE = "delete"
     MOVE = "move"
@@ -16,6 +41,30 @@ class ActionName(StrEnum):
 
 
 class ActionStatus(StrEnum):
+    """Where one ``ActionResult`` is in its own lifecycle, separate from which action it names.
+
+    ``policy.py`` only ever produces ``PENDING`` or ``SKIPPED``. The runner
+    is what moves a ``PENDING`` row to ``COMPLETED`` or ``FAILED`` once it
+    has actually tried to perform the action.
+
+    A row still at ``PENDING`` in a written report means the process died
+    between planning the action and carrying it out.
+
+    Values:
+        PENDING: The action is due but has not run yet.
+        SKIPPED: Nothing needs to touch the file, e.g. the decision was
+            ``PASSED`` or ``WARNED``.
+        COMPLETED: The runner performed the action and it succeeded.
+        FAILED: The runner tried to perform the action and it raised.
+
+    Example:
+        >>> ActionStatus.PENDING
+        <ActionStatus.PENDING: 'pending'>
+
+        >>> ActionStatus.PENDING == "pending"
+        True
+    """
+
     PENDING = "pending"
     SKIPPED = "skipped"
     COMPLETED = "completed"
@@ -23,18 +72,99 @@ class ActionStatus(StrEnum):
 
 
 class Decision(StrEnum):
-    PASS = "pass"
-    WARN = "warn"
-    FAIL = "fail"
+    """Was the data itself good, for one source object or for the whole run.
+
+    Derived from expectation severities, not from whether COSMOS managed to
+    run at all. An object that could not be read has no ``Decision``, because
+    there was no data to judge (see ``RunObjectStatus.ABORTED``).
+
+    Values:
+        PASSED: No expectation failed, or only ``info`` ones did.
+        WARNED: The worst failing expectation was ``warning``.
+        FAILED: At least one ``critical`` expectation failed.
+
+    Only ``FAILED`` ever triggers the configured ``on_failure`` action. The
+    other two leave the file untouched but are still written to the report.
+
+    At the run level, ``CosmosResult.decision`` rolls these up across every
+    object. This is the "is the data okay" verdict, read by whoever owns the
+    data, as opposed to ``RunStatus``, which answers "did COSMOS do its job"
+    and is read by whoever runs the pipeline.
+
+    Example:
+        >>> Decision.FAILED
+        <Decision.FAILED: 'failed'>
+
+        >>> Decision.FAILED == "failed"
+        True
+    """
+
+    PASSED = "passed"
+    WARNED = "warned"
+    FAILED = "failed"
 
 
 class RunStatus(StrEnum):
+    """Did COSMOS manage to do its job for this run, independent of what the data looked like.
+
+    A rollup of every object's ``RunObjectStatus``, not of their
+    ``Decision``. A run where every single file failed every expectation is
+    still ``COMPLETED``, because COSMOS read and validated all of them
+    successfully.
+
+    Values:
+        COMPLETED: Every object completed, including an empty, allowed glob.
+        PARTIAL: A mix of completed and aborted objects.
+        ABORTED: Every object aborted.
+
+    ``ABORTED`` is deliberately louder than ``PARTIAL``: every object
+    failing to even run points at something systemic (bad credentials, a
+    network outage), not at ordinary bad data, and should draw attention
+    first.
+
+    ``PARTIAL`` is the everyday case of "partial failure continues": most
+    files were fine, a few individually could not be read, and the rest
+    still ran.
+
+    Read by whoever runs the pipeline; ``Decision`` is read by whoever owns
+    the data.
+
+    Example:
+        >>> RunStatus.PARTIAL
+        <RunStatus.PARTIAL: 'partial'>
+
+        >>> RunStatus.PARTIAL == "partial"
+        True
+    """
+
     COMPLETED = "completed"
     PARTIAL = "partial"
     ABORTED = "aborted"
 
 
 class RunObjectStatus(StrEnum):
+    """Did COSMOS finish processing one source object, independent of the verdict.
+
+    Set once per object, before ``Decision`` is even known.
+
+    Values:
+        COMPLETED: The object was read and every expectation ran, whatever
+            the result was.
+        ABORTED: Something raised before that point instead, e.g. a corrupt
+            file or an unreadable encoding, caught by the runner's
+            ``try/except`` around the read and validate steps.
+
+    ``RunStatus`` is the rollup of these two values across every object in
+    the run.
+
+    Example:
+        >>> RunObjectStatus.ABORTED
+        <RunObjectStatus.ABORTED: 'aborted'>
+
+        >>> RunObjectStatus.ABORTED == "aborted"
+        True
+    """
+
     COMPLETED = "completed"
     ABORTED = "aborted"
 
@@ -42,13 +172,27 @@ class RunObjectStatus(StrEnum):
 class Severity(StrEnum):
     """COSMOS's own mirror of GX's ``FailureSeverity``: same three levels, no GX import.
 
-    Building a GX expectation suite requires a ``FailureSeverity`` value (from
-    ``great_expectations.expectations.metadata_types``), but ``results.py`` is a
-    leaf module that must import nothing of ours and nothing of GX's, so every
-    other module can depend on it without dragging ``great_expectations`` in
-    transitively. Declaring an equivalent enum here instead keeps that boundary
-    intact; ``gx/validator.py``'s ``_map_severity`` is the only place that
-    translates between the two.
+    Building a GX expectation suite requires a ``FailureSeverity`` value
+    (from ``great_expectations.expectations.metadata_types``), but
+    ``results.py`` is a leaf module that must import nothing of ours and
+    nothing of GX's, so every other module can depend on it without dragging
+    ``great_expectations`` in transitively.
+
+    Declaring an equivalent enum here instead keeps that boundary intact;
+    ``gx/validator.py``'s ``_map_severity`` is the only place that translates
+    between the two.
+
+    Values:
+        CRITICAL: A failure triggers the configured ``on_failure`` action.
+        WARNING: A failure is recorded but the file is left alone.
+        INFO: A failure is recorded as a note for a person, nothing more.
+
+    Example:
+        >>> Severity.CRITICAL
+        <Severity.CRITICAL: 'critical'>
+
+        >>> Severity.CRITICAL == "critical"
+        True
     """
 
     CRITICAL = "critical"
@@ -180,38 +324,26 @@ class SourceObjectResult(BaseModel):
     source_object: SourceObjectMetadata = Field(
         description="The identifier or name of the source object being validated."
     )
-    row_count: int | None = Field(
-        default=None, description="The number of rows processed during the validation operation."
-    )
-    column_count: int | None = Field(
-        default=None, description="The number of columns processed during the validation operation."
-    )
+    row_count: int | None = Field(description="The number of rows processed during the validation operation.")
+    column_count: int | None = Field(description="The number of columns processed during the validation operation.")
     read_duration_sec: float | None = Field(default=None, description="The duration of the read operation in seconds.")
-    validation_duration_sec: float | None = Field(
-        default=None, description="The duration of the validation operation in seconds."
-    )
+    validation_duration_sec: float | None = Field(description="The duration of the validation operation in seconds.")
     error_type: str | None = Field(
-        default=None,
         description="The type of error that occurred during the validation operation, if any.",
     )
     error_message: str | None = Field(
-        default=None,
         description="The error message associated with the error that occurred during the validation operation, if any.",
     )
     decision: Decision | None = Field(
-        default=None,
         description="The decision made based on the validation results, if any.",
     )
-    expectations: list[ExpectationResult] = Field(
-        default_factory=list,
+    expectations: list[ExpectationResult] | None = Field(
         description="The list of expectation results for the source object.",
     )
     action: ActionResult | None = Field(
-        default=None,
         description="The result of the action taken after the validation operation, if any.",
     )
     raw_gx_result: dict | None = Field(
-        default=None,
         description="The raw result from the GX operation, if any.",
         exclude=True,
     )
@@ -225,12 +357,10 @@ class CosmosResult(BaseModel):
     of ``results`` and nothing else decides them.
     """
 
-    validation_id: str = Field(description="The unique identifier for the validation operation.")
     cosmos_version: str = Field(
         default=_COSMOS_VERSION,
         description="The version of Cosmos used for the validation.",
     )
-    attempt: int = Field(description="The attempt number for the specific run of the Cosmos operation.")
     run_id: str = Field(description="The unique identifier for the specific run of the Cosmos operation.")
     run_ts: datetime.datetime = Field(description="The timestamp of the specific run of the Cosmos operation.")
     results: list[SourceObjectResult] = Field(
