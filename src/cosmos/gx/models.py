@@ -1,4 +1,5 @@
 import hashlib
+from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, computed_field, model_validator
@@ -121,13 +122,15 @@ class DataDocsConfig(BaseModel):
     )
     store_path: str | None = Field(
         default=None,
-        description="The path where Data Docs will be stored. If not provided, a default path will be used.",
+        description="The path where Data Docs will be stored.",
     )
 
     @model_validator(mode="after")
     def _validate_store_path_if_enabled(self) -> Self:
         if self.enabled and not self.store_path:
-            raise ValueError("`store_path` must be provided if Data Docs generation is enabled.")
+            raise ValueError("store_path must be specified if Data Docs are enabled")
+        if self.store_path is not None:
+            self.store_path = str(Path(self.store_path).resolve())
         return self
 
 

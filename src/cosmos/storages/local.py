@@ -135,7 +135,7 @@ class LocalStorage(BaseStorage):
         logger.info("copied %s -> %s", src, dest)
         return str(dest)
 
-    def delete_obj(self, uri: str) -> None:
+    def delete_obj(self, src: str) -> None:
         """Delete a file, treating one that is already gone as success.
 
         A re-run after a crash mid-action can find the file deleted by the
@@ -144,15 +144,15 @@ class LocalStorage(BaseStorage):
         the report is what records whether the first attempt got this far.
 
         Args:
-            uri: Path of the file to delete.
+            src: Path of the file to delete.
 
         Raises:
             OSError: If the file exists but cannot be removed, such as
                 ``PermissionError`` when another process holds it open.
         """
-        path = Path(uri)
+        path = Path(src)
         if not path.exists():
-            logger.warning("nothing to delete at %s; it may already be gone", uri)
+            logger.warning("nothing to delete at %s; it may already be gone", src)
             return
         path.unlink()
-        logger.info("deleted %s", uri)
+        logger.info("deleted %s", src)

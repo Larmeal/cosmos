@@ -49,7 +49,12 @@ class BaseEngine(BaseModel, ABC):
         return self
 
     @abstractmethod
-    def load_data(self, file_path: str, **options: Any) -> pd.DataFrame | SparkDataFrame | None:
+    def statistics(self, data: pd.DataFrame | SparkDataFrame) -> dict[str, Any]:
+        """Return engine-specific statistics about the loaded data."""
+        pass
+
+    @abstractmethod
+    def load_data(self, file_path: str) -> pd.DataFrame | SparkDataFrame | None:
         """Load data from the specified source.
 
         This method should be implemented by subclasses to handle the specific
