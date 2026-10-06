@@ -14,5 +14,8 @@ class SparkEngine(BaseEngine):
 
     engine: Literal["spark"]
 
-    def load_data(self, file_path: str | Path, **options: Any) -> None | DataFrame:
+    def statistics(self, data: DataFrame) -> dict[str, Any]:
+        pass
+
+    def load_data(self, file_path: str | Path) -> DataFrame:
         pass
