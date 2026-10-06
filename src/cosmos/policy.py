@@ -1,28 +1,39 @@
 from cosmos.actions import IgnoreFailureAction, OnFailureActionConfig, RelocateFailureAction
-from cosmos.results import ActionName, ActionResult, ActionStatus, Decision, ExpectationResult, Severity
+from cosmos.results import (
+    ActionName,
+    ActionResult,
+    ActionStatus,
+    Decision,
+    ExpectationResult,
+    Severity,
+    SourceObjectResult,
+)
 
 
-class Policy:
+class SourceObjectPolicy:
     """Decides what a validation result means, and what should happen to the file.
 
-    Given the expectations checked against one source object, Policy answers the
+    Given the expectations checked against one source object, SourceObjectPolicy answers the
     two questions the rest of the run needs:
 
-        "was the data good?"       -> Decision.PASS / WARN / FAIL
-        "what do we do about it?"  -> an ActionResult naming the action to perform
+    ```
+    was the data good?       -> Decision.PASSED / WARNED / FAILED
+    what do we do about it?  -> an ActionResult naming the action to perform
+    ```
 
     Severity connects the two: a failure matters only as much as the contract
     said it should.
 
-        a critical expectation failed  -> FAIL, and the configured on_failure
-                                          action is planned (move, copy, delete)
-        only warnings failed           -> WARN, the file is left where it is
-        nothing failed, or only info   -> PASS, the file is left where it is
+    ```
+    a critical expectation failed  -> FAIL, and the configured on_failure action is planned (move, copy, delete)
+    only warnings failed           -> WARN, the file is left where it is
+    nothing failed, or only info   -> PASS, the file is left where it is
+    ```
 
     Only FAIL ever touches the file. WARN and PASS are still written to the
     report; they just do not move anything.
 
-    Policy is a brain with no hands. It never opens a file, relocates one, or
+    SourceObjectPolicy is a brain with no hands. It never opens a file, relocates one, or
     writes a report, and it keeps no per-object state: ``decide()`` takes one
     object's results and returns the verdicts rather than storing them, so one
     instance is built per run and reused, unchanged, for every object in it.
@@ -34,9 +45,9 @@ class Policy:
     records that intent before the runner acts, so a row still at ``PENDING``
     afterwards means the process died in between.
 
-    Policy looks at one source object at a time, never at its neighbours. The
+    SourceObjectPolicy looks at one source object at a time, never at its neighbours. The
     run-level verdicts (``run_status``, ``decision``) are rollups computed over
-    every object after the loop finishes, not something Policy produces.
+    every object after the loop finishes, not something SourceObjectPolicy produces.
 
     Attributes:
         on_failure_config: What the config said to do with a file that fails.
@@ -55,10 +66,10 @@ class Policy:
         failures = [result for result in expectation_results if not result.success]
 
         if any(result.severity == Severity.CRITICAL for result in failures):
-            return Decision.FAIL
+            return Decision.FAILED
         if any(result.severity == Severity.WARNING for result in failures):
-            return Decision.WARN
-        return Decision.PASS
+            return Decision.WARNED
+        return Decision.PASSED
 
     def _plan_action(self, decision_result: Decision) -> ActionResult:
         """Derives the unexecuted action from the verdict and ``on_failure_config``.
@@ -68,7 +79,7 @@ class Policy:
         because nothing touches the file. The runner is what performs a
         ``PENDING`` action and updates its status afterwards.
         """
-        if decision_result == Decision.FAIL and not isinstance(self.on_failure_config, IgnoreFailureAction):
+        if decision_result == Decision.FAILED and not isinstance(self.on_failure_config, IgnoreFailureAction):
             dead_letter = (
                 self.on_failure_config.dead_letter
                 if isinstance(self.on_failure_config, RelocateFailureAction)
@@ -107,3 +118,21 @@ class Policy:
         action_result = self._plan_action(decision_result)
 
         return decision_result, action_result
+
+
+class CosmosPolicy:
+    """Encapsulates the overall policy for handling source objects within COSMOS."""
+
+    def _make_decision(self, source_object_results: list[SourceObjectResult]) -> Decision:
+        """Determines the overall decision for a list of source object results."""
+
+        decisions = [result.decision for result in source_object_results]
+
+        if Decision.FAILED in decisions:
+            return Decision.FAILED
+        if Decision.WARNED in decisions:
+            return Decision.WARNED
+        return Decision.PASSED
+
+    def decide(self, source_object_results: list[SourceObjectResult]) -> Decision:
+        return self._make_decision(source_object_results)
