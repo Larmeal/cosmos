@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from time import perf_counter
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
     from cosmos.sinks import SinkConfig
     from cosmos.sources import SourceConfig
     from cosmos.storages import StorageBackend
+
+logger = logging.getLogger(__name__)
 
 
 class Runner:
@@ -58,6 +61,14 @@ class Runner:
     def storage(self) -> StorageBackend:
         return self.engine.source.backend
 
+    def __repr__(self) -> str:
+        return (
+            f"Runner(id={self.engine.id!r}, "
+            f"engine={self.engine.engine!r}, "
+            f"source={self.source.file_path!r}, "
+            f"contract={self.validation.contract.data_asset_name!r})"
+        )
+
     @contextmanager
     def _timer(self) -> Generator[Callable[[], float]]:
         start = perf_counter()
@@ -65,6 +76,7 @@ class Runner:
 
     def run(self) -> None:
         source_object_metadata: list[SourceObjectMetadata] = self.storage.glob(self.engine.source.file_path)
+        logger.info("resolved %d source object(s) for %s", len(source_object_metadata), self.engine.source.file_path)
 
         source_object_results: list[SourceObjectResult] = []
         for source in source_object_metadata:
@@ -94,12 +106,13 @@ class Runner:
                     self.on_failure.handle(src=source.path)
                     action_result.status = ActionStatus.COMPLETED
             except Exception as e:
+                logger.exception("failed to process %s", source.path)
                 read_duration_sec = None
                 validation_duration_sec = None
                 gx_result = None
                 statistics = {}
                 cosmos_expectation_result = []
-                decision = Decision.WARNED
+                decision = Decision.FAILED
                 action_result = None
                 error_type = type(e).__name__
                 error_message = str(e)
@@ -141,4 +154,5 @@ class Runner:
             decision=cosmos_decision,
         )
 
+        logger.info("run %s finished: run_status=%s, decision=%s", cosmos_result.run_id, run_status, cosmos_decision)
         self._sink.write_sink(result=cosmos_result)

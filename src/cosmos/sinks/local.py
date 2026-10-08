@@ -1,8 +1,11 @@
+import logging
 from pathlib import Path
 from typing import Literal
 
 from cosmos.results import CosmosResult
 from cosmos.sinks.base import BaseFileFormat
+
+logger = logging.getLogger(__name__)
 
 
 class LocalSink(BaseFileFormat):
@@ -26,3 +29,4 @@ class LocalSink(BaseFileFormat):
 
         with file_path.open("w", encoding="utf-8") as f:
             f.write(self._handle(result))
+        logger.info("wrote report for run %s to %s", result.run_id, file_path)

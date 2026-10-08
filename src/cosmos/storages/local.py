@@ -61,7 +61,14 @@ class LocalStorage(BaseStorage):
             pattern: A local glob, e.g. ``data/test_*.csv``. A path with no
                 wildcard matches only itself.
         """
-        return (p for p in map(Path, _fs_glob(pattern, recursive=True)) if p.is_file())
+
+        all_objects = _fs_glob(pattern, recursive=True)
+        files = list(object.resolve() for object in map(Path, all_objects) if object.is_file())
+        logger.debug("found %d file(s):\n%s", len(files), "\n".join(f"  - {file}" for file in files))
+
+        if not files:
+            raise FileNotFoundError(f"No files matched the pattern: {pattern}")
+        return files
 
     def _to_metadata(self, entry: Path) -> SourceObjectMetadata:
         """Read size and mtime from a single ``os.stat`` call.

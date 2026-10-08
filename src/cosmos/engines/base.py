@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Self
 
@@ -13,6 +14,8 @@ from cosmos.sources import SourceConfig
 if TYPE_CHECKING:
     import pandas as pd
     from pyspark.sql import DataFrame as SparkDataFrame
+
+logger = logging.getLogger(__name__)
 
 
 class BaseEngine(BaseModel, ABC):
@@ -47,6 +50,18 @@ class BaseEngine(BaseModel, ABC):
         ) and self.on_failure.backend is None:
             self.on_failure.backend = self.source.backend
         return self
+
+    @abstractmethod
+    def is_empty(self, data: pd.DataFrame | SparkDataFrame) -> bool:
+        """Check if the provided data is empty."""
+        pass
+
+    def _validate_on_empty(self, data: pd.DataFrame | SparkDataFrame) -> None:
+        """Validate the data based on the 'on_empty' configuration."""
+        if self.is_empty(data):
+            logger.warning("source file %s is empty", self.source.file_path)
+            if self.source.on_empty == "fail":
+                raise ValueError("Data is empty and 'on_empty' is set to 'fail'.")
 
     @abstractmethod
     def statistics(self, data: pd.DataFrame | SparkDataFrame) -> dict[str, Any]:
