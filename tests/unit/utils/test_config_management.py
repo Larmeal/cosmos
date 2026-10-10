@@ -36,7 +36,7 @@ CASES = [
                 "key_2_level_1": 2,
             },
         ),
-        id="nested_dict_merge",
+        id="replace_nested_key_keeps_other_keys",
     ),
     pytest.param(
         Case(
@@ -45,7 +45,7 @@ CASES = [
             deep_copy=True,
             expected={"x": {"y": {"z": 9}}, "w": 2},
         ),
-        id="replace_with_int_values",
+        id="replace_value_with_int",
     ),
     pytest.param(
         Case(
@@ -54,7 +54,7 @@ CASES = [
             deep_copy=True,
             expected={"x": {"y": {"z": "new_value"}}, "w": 2},
         ),
-        id="replace_with_str_values",
+        id="replace_value_with_str",
     ),
     pytest.param(
         Case(
@@ -63,7 +63,7 @@ CASES = [
             deep_copy=True,
             expected={"x": {"y": {"z": None}}, "w": 2},
         ),
-        id="replace_with_null_values",
+        id="replace_value_with_none",
     ),
     pytest.param(
         Case(
@@ -72,7 +72,7 @@ CASES = [
             deep_copy=True,
             expected={"x": {"y": {"z": 1}}, "w": 2},
         ),
-        id="no_key_to_replace",
+        id="missing_key_leaves_obj_unchanged",
     ),
     pytest.param(
         Case(
@@ -81,7 +81,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 1}, "c": "value"},
         ),
-        id="sibling_str_substring_key",
+        id="skip_str_sibling_when_key_is_its_substring",
     ),
     pytest.param(
         Case(
@@ -90,7 +90,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 2}, "x": None},
         ),
-        id="sibling_none",
+        id="skip_none_sibling",
     ),
     pytest.param(
         Case(
@@ -99,7 +99,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 2}, "tags": ["b"]},
         ),
-        id="sibling_list_containing_key",
+        id="skip_list_sibling_containing_key",
     ),
     pytest.param(
         Case(
@@ -108,7 +108,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 2}, "f": 1.5, "t": True},
         ),
-        id="sibling_float_and_bool",
+        id="skip_float_and_bool_siblings",
     ),
     # Edge cases.
     pytest.param(
@@ -118,7 +118,7 @@ CASES = [
             deep_copy=True,
             expected={},
         ),
-        id="empty_obj",
+        id="empty_obj_returns_empty",
     ),
     pytest.param(
         Case(
@@ -127,7 +127,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 1}},
         ),
-        id="empty_replaced_key",
+        id="empty_replaced_key_leaves_obj_unchanged",
     ),
     pytest.param(
         Case(
@@ -136,7 +136,7 @@ CASES = [
             deep_copy=True,
             expected={"a": 9, "b": {"c": 2}},
         ),
-        id="key_at_top_level",
+        id="replace_top_level_key_without_recursing",
     ),
     pytest.param(
         Case(
@@ -145,7 +145,7 @@ CASES = [
             deep_copy=True,
             expected={"x": {"y": {"p": 10}}, "q": {"r": 20}},
         ),
-        id="multiple_keys_in_different_branches",
+        id="replace_multiple_keys_in_different_branches",
     ),
     pytest.param(
         Case(
@@ -154,7 +154,7 @@ CASES = [
             deep_copy=True,
             expected={"a": 9, "b": {"c": 8}},
         ),
-        id="multiple_keys_top_level_and_nested",
+        id="replace_multiple_keys_one_top_level_one_nested",
     ),
     pytest.param(
         Case(
@@ -163,7 +163,7 @@ CASES = [
             deep_copy=True,
             expected={"x": {"y": {"z": {"n": 1}}}},
         ),
-        id="replace_with_dict_value_as_a_whole",
+        id="replace_nested_key_with_dict_replaces_whole_value",
     ),
     pytest.param(
         Case(
@@ -172,7 +172,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 2}, "c": {"b": 2}},
         ),
-        id="same_key_different_root_levels",
+        id="duplicate_key_in_two_branches_replaces_both",
     ),
     pytest.param(
         Case(
@@ -181,7 +181,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 2}, "c": {"b": 1}},
         ),
-        id="replace_parent_key_with_first_order",
+        id="replace_first_top_level_parent_with_dict",
     ),
     pytest.param(
         Case(
@@ -190,7 +190,7 @@ CASES = [
             deep_copy=True,
             expected={"a": {"b": 1}, "c": {"b": 2}},
         ),
-        id="replace_parent_key_with_seconds_order",
+        id="replace_last_top_level_parent_with_dict",
     ),
 ]
 
