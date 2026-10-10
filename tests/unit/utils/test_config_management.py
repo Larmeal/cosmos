@@ -1,0 +1,218 @@
+from typing import NamedTuple
+
+import pytest
+
+from cosmos.utils.config_management import dict_deep_merge
+
+
+class Case(NamedTuple):
+    obj: dict
+    replaced_key: dict
+    deep_copy: bool
+    expected: dict
+
+
+CASES = [
+    pytest.param(
+        Case(
+            obj={
+                "key_1_level_1": {
+                    "key_1_level_2": {
+                        "key_1_level_3": "value_1_level_3",
+                        "key_2_level_3": "value_1_level_3",
+                    },
+                },
+                "key_2_level_1": 2,
+            },
+            replaced_key={"key_2_level_3": "new_value_1_level_3"},
+            deep_copy=True,
+            expected={
+                "key_1_level_1": {
+                    "key_1_level_2": {
+                        "key_1_level_3": "value_1_level_3",
+                        "key_2_level_3": "new_value_1_level_3",
+                    },
+                },
+                "key_2_level_1": 2,
+            },
+        ),
+        id="nested_dict_merge",
+    ),
+    pytest.param(
+        Case(
+            obj={"x": {"y": {"z": 1}}, "w": 2},
+            replaced_key={"z": 9},
+            deep_copy=True,
+            expected={"x": {"y": {"z": 9}}, "w": 2},
+        ),
+        id="replace_with_int_values",
+    ),
+    pytest.param(
+        Case(
+            obj={"x": {"y": {"z": 1}}, "w": 2},
+            replaced_key={"z": "new_value"},
+            deep_copy=True,
+            expected={"x": {"y": {"z": "new_value"}}, "w": 2},
+        ),
+        id="replace_with_str_values",
+    ),
+    pytest.param(
+        Case(
+            obj={"x": {"y": {"z": 1}}, "w": 2},
+            replaced_key={"z": None},
+            deep_copy=True,
+            expected={"x": {"y": {"z": None}}, "w": 2},
+        ),
+        id="replace_with_null_values",
+    ),
+    pytest.param(
+        Case(
+            obj={"x": {"y": {"z": 1}}, "w": 2},
+            replaced_key={"xxx": 42},
+            deep_copy=True,
+            expected={"x": {"y": {"z": 1}}, "w": 2},
+        ),
+        id="no_key_to_replace",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "c": "value"},
+            replaced_key={"val": 1},
+            deep_copy=True,
+            expected={"a": {"b": 1}, "c": "value"},
+        ),
+        id="sibling_str_substring_key",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "x": None},
+            replaced_key={"b": 2},
+            deep_copy=True,
+            expected={"a": {"b": 2}, "x": None},
+        ),
+        id="sibling_none",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "tags": ["b"]},
+            replaced_key={"b": 2},
+            deep_copy=True,
+            expected={"a": {"b": 2}, "tags": ["b"]},
+        ),
+        id="sibling_list_containing_key",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "f": 1.5, "t": True},
+            replaced_key={"b": 2},
+            deep_copy=True,
+            expected={"a": {"b": 2}, "f": 1.5, "t": True},
+        ),
+        id="sibling_float_and_bool",
+    ),
+    # Edge cases.
+    pytest.param(
+        Case(
+            obj={},
+            replaced_key={"a": 1},
+            deep_copy=True,
+            expected={},
+        ),
+        id="empty_obj",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}},
+            replaced_key={},
+            deep_copy=True,
+            expected={"a": {"b": 1}},
+        ),
+        id="empty_replaced_key",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": 1, "b": {"c": 2}},
+            replaced_key={"a": 9},
+            deep_copy=True,
+            expected={"a": 9, "b": {"c": 2}},
+        ),
+        id="key_at_top_level",
+    ),
+    pytest.param(
+        Case(
+            obj={"x": {"y": {"p": 1}}, "q": {"r": 2}},
+            replaced_key={"p": 10, "r": 20},
+            deep_copy=True,
+            expected={"x": {"y": {"p": 10}}, "q": {"r": 20}},
+        ),
+        id="multiple_keys_in_different_branches",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": 1, "b": {"c": 2}},
+            replaced_key={"a": 9, "c": 8},
+            deep_copy=True,
+            expected={"a": 9, "b": {"c": 8}},
+        ),
+        id="multiple_keys_top_level_and_nested",
+    ),
+    pytest.param(
+        Case(
+            obj={"x": {"y": {"z": 1}}},
+            replaced_key={"z": {"n": 1}},
+            deep_copy=True,
+            expected={"x": {"y": {"z": {"n": 1}}}},
+        ),
+        id="replace_with_dict_value_as_a_whole",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "c": {"b": 1}},
+            replaced_key={"b": 2},
+            deep_copy=True,
+            expected={"a": {"b": 2}, "c": {"b": 2}},
+        ),
+        id="same_key_different_root_levels",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "c": {"b": 1}},
+            replaced_key={"a": {"b": 2}},
+            deep_copy=True,
+            expected={"a": {"b": 2}, "c": {"b": 1}},
+        ),
+        id="replace_parent_key_with_first_order",
+    ),
+    pytest.param(
+        Case(
+            obj={"a": {"b": 1}, "c": {"b": 1}},
+            replaced_key={"c": {"b": 2}},
+            deep_copy=True,
+            expected={"a": {"b": 1}, "c": {"b": 2}},
+        ),
+        id="replace_parent_key_with_seconds_order",
+    ),
+]
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_dict_deep_merge(case: Case) -> None:
+    result = dict_deep_merge(case.obj, case.replaced_key, case.deep_copy)
+    assert result == case.expected
+
+
+def test_deep_copy_true_leaves_original_untouched() -> None:
+    obj = {"x": {"y": 1}}
+    result = dict_deep_merge(obj, {"y": 9}, deep_copy=True)
+
+    assert obj == {"x": {"y": 1}}
+    assert result is not obj
+    assert result["x"] is not obj["x"]  # deep copy, not shallow
+
+
+def test_deep_copy_false_mutates_in_place() -> None:
+    obj = {"x": {"y": 1}}
+    result = dict_deep_merge(obj, {"y": 9}, deep_copy=False)
+
+    assert result is obj
+    assert obj == {"x": {"y": 9}}
