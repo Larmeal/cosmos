@@ -205,13 +205,22 @@ class SourceObjectMetadata(BaseModel):
 
     Produced by ``storage.glob``: every backend fills the same three required
     fields from its own listing, so a missing one fails at construction rather
-    than surfacing as a hole in the report. ``metadata`` is a backend-specific
-    bag that nothing downstream interprets.
+    than surfacing as a hole in the report. ``created_at`` is always present but
+    is only exact where the backend reports a creation time; elsewhere it is an
+    approximation (see the field). ``metadata`` is a backend-specific bag that
+    nothing downstream interprets.
     """
 
     path: str = Field(description="Full URI of the source object, the report's source_object key.")
     size_bytes: int = Field(description="Object size in bytes, from the listing.")
-    modified: datetime.datetime = Field(description="Last-modified time (UTC), from the listing.")
+    created_at: datetime.datetime = Field(
+        description=(
+            "Creation time (UTC), from the listing. Exact where the backend reports it (GCS, Windows, macOS). "
+            "An approximation otherwise: on Linux, Python's os.stat does not expose the creation time, "
+            "so a backend that cannot tell falls back to modified_at."
+        ),
+    )
+    modified_at: datetime.datetime = Field(description="Last-modified time (UTC), from the listing.")
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Backend-specific extras nothing downstream interprets (e.g. GCS etag, md5_hash).",

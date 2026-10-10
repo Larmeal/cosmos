@@ -567,7 +567,7 @@ class Plan:
             full_path: Show each object's path exactly as stored (absolute,
                 for local files) instead of relative to the current
                 directory. See ``_relative_to_cwd``.
-            tz: The zone to render each object's ``modified`` timestamp in,
+            tz: The zone to render each object's ``modified_at`` timestamp in,
                 already resolved by ``render()`` from its ``timezone``
                 argument.
 
@@ -606,7 +606,7 @@ class Plan:
         shown = self.source_objects if full else self.source_objects[:_OBJECT_PREVIEW]
         for index, obj in enumerate(shown, start=1):
             size = _human_size(obj.size_bytes).rjust(8)
-            stamp = obj.modified.astimezone(tz).strftime("%Y-%m-%d %H:%M")
+            stamp = obj.modified_at.astimezone(tz).strftime("%Y-%m-%d %H:%M")
             display_path = obj.path if full_path else _relative_to_cwd(obj.path)
             prefix = f"{index:>8}  " if full else "      "
             lines.append(f"{prefix}{_elide_path(display_path).ljust(30)}{size}   modified {stamp}")
@@ -941,7 +941,7 @@ class Planner:
             For ``source.file_path: "data/test_*.csv"`` matching three
             files, this returns a three-item list, sorted
             ``test_1.csv, test_2.csv, test_3.csv``, each with its own
-            ``size_bytes`` and ``modified`` timestamp from the filesystem.
+            ``size_bytes`` and ``modified_at`` timestamp from the filesystem.
 
         Note:
             The actual listing logic (what "glob" means for local files vs.

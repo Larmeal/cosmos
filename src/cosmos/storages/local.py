@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 import shutil
+import sys
 from collections.abc import Iterable
 from glob import glob as _fs_glob
 from pathlib import Path
@@ -71,20 +72,31 @@ class LocalStorage(BaseStorage):
         return files
 
     def _to_metadata(self, entry: Path) -> SourceObjectMetadata:
-        """Read size and mtime from a single ``os.stat`` call.
+        """Read size, creation time and mtime from a single ``os.stat`` call.
 
         The path is kept exactly as the glob produced it (not resolved), so it
         matches the ``source_object`` key the report is written under.
+
+        ``created_at`` is exact where the OS records a creation time:
+        ``st_birthtime`` (macOS, BSD, and Windows on Python 3.12+), or ``st_ctime``
+        on Windows, where it is the creation time. Elsewhere (Linux) ``st_ctime``
+        means "last metadata change" and moves when the file is renamed or chmod'ed,
+        so it is not used; ``created_at`` falls back to the modification time.
 
         Raises:
             OSError: If the file cannot be stat'd, most often because it vanished
                 between the listing and this call.
         """
         stat = entry.stat()
+        birth = getattr(stat, "st_birthtime", None)
+        if birth is None and sys.platform == "win32":
+            birth = stat.st_ctime
+        modified_at = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC)
         return SourceObjectMetadata(
             path=str(Path(entry).resolve()),
             size_bytes=stat.st_size,
-            modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC),
+            created_at=datetime.datetime.fromtimestamp(birth, tz=datetime.UTC) if birth is not None else modified_at,
+            modified_at=modified_at,
         )
 
     def move_obj(self, src: str, dst_dir: str) -> str:

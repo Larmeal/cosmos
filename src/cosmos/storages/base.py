@@ -58,9 +58,11 @@ class BaseStorage(BaseModel, ABC):
     def _to_metadata(self, entry: object) -> SourceObjectMetadata:
         """Map one entry from ``_list_files`` to a ``SourceObjectMetadata``.
 
-        Must populate ``path``, ``size_bytes`` and ``modified``. The entry already
-        carries what is needed (a GCS ``Blob`` from a listing has ``size`` and
-        ``updated`` on it), so this never issues another request.
+        Must populate ``path``, ``size_bytes``, ``created_at`` and ``modified_at``.
+        A backend that cannot report a creation time falls back to the
+        modification time rather than leaving ``created_at`` empty. The entry already
+        carries what is needed (a GCS ``Blob`` from a listing has ``size``,
+        ``time_created`` and ``updated`` on it), so this never issues another request.
         """
 
     @abstractmethod
