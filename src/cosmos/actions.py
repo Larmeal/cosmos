@@ -15,6 +15,23 @@ class BaseFailureAction(BaseModel, ABC):
 
     model_config = ConfigDict(extra="forbid")
 
+    mode: Literal["decision", "any_failure"] = Field(
+        default="decision",
+        description=(
+            "Which outcomes make this action fire. "
+            "'decision' (default, safe): only when COSMOS read the file and judged the data to have "
+            "failed (Decision.FAILED, a critical expectation did not pass). A file COSMOS could not "
+            "read or validate (RunObjectStatus.ABORTED) is never acted on: it stays where it is and "
+            "the problem is reported instead, as status 'aborted' with its error_type and "
+            "error_message on that object, and run_status 'partial' or 'aborted' for the run. "
+            "'any_failure': fires for Decision.FAILED and also for an ABORTED file. This can act on "
+            "a file that never had a chance to be judged, for example a transient read error on an "
+            "otherwise good file; choosing it means accepting that risk. "
+            "In both modes a file that passed or only warned (Decision.PASSED, Decision.WARNED) is "
+            "left alone."
+        ),
+    )
+
     @abstractmethod
     def handle(self, src: str) -> None:
         """Perform the action on the source file."""
