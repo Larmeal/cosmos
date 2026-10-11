@@ -12,8 +12,7 @@ from cosmos.sinks import SinkConfig
 from cosmos.sources import SourceConfig
 
 if TYPE_CHECKING:
-    import pandas as pd
-    from pyspark.sql import DataFrame as SparkDataFrame
+    pass
 
 
 class BaseEngine(BaseModel, ABC):
@@ -42,7 +41,7 @@ class BaseEngine(BaseModel, ABC):
         default_factory=IgnoreFailureAction,
         description="What to do with the source file when validation fails. Defaults to leaving it in place.",
     )
-    dataframe: pd.DataFrame | SparkDataFrame | None = Field(
+    dataframe: Any | None = Field(
         default=None,
         description="Holds the loaded data after calling the load_data method.",
     )
