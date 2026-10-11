@@ -22,8 +22,10 @@ from typing import Any, NamedTuple
 
 import pytest
 
+from cosmos.engines import BaseEngine
 from cosmos.results import ActionName, ActionStatus, Decision, RunObjectStatus, RunStatus, Severity
 from cosmos.runner import Runner
+from cosmos.storages.local import LocalStorage
 
 pytestmark = pytest.mark.integration
 
@@ -32,6 +34,41 @@ MOCKED_CSV_NAME = "test-file.csv"
 Workspace = dict[str, Path]
 MakeRunner = Callable[..., Runner]
 ReadReport = Callable[[], dict[str, Any]]
+MODES = ["decision", "any_failure"]
+
+
+def _deny_reads(monkeypatch: pytest.MonkeyPatch, runner: Runner) -> None:
+    """Make every CSV read fail with ``PermissionError``.
+
+    A real permission error cannot be produced portably (Windows ignores chmod), so the
+    read itself is made to fail. Everything after it is the real code.
+    """
+
+    def deny(self: BaseEngine, *args: Any, **kwargs: Any) -> None:
+        raise PermissionError("access denied")
+
+    monkeypatch.setattr(type(runner.engine), "load_data", deny)
+
+
+# The storage method each failure action ends up calling (see `actions.py`).
+BACKEND_METHOD = {
+    ActionName.MOVE: "move_obj",
+    ActionName.COPY: "copy_obj",
+    ActionName.DELETE: "delete_obj",
+}
+
+
+def _deny_action(monkeypatch: pytest.MonkeyPatch, action: ActionName) -> None:
+    """Make ``action`` fail with ``PermissionError`` when the storage tries to perform it.
+
+    A real permission error cannot be produced portably (Windows ignores chmod), so the
+    storage call itself is made to fail. Everything before and after it is the real code.
+    """
+
+    def deny(self: LocalStorage, *args: Any, **kwargs: Any) -> None:
+        raise PermissionError("access denied for some reason")
+
+    monkeypatch.setattr(LocalStorage, BACKEND_METHOD[action], deny)
 
 
 # What the report looks like for the "normal" case (the dict built by `_expected_report`).
@@ -184,7 +221,42 @@ def test_failed_validation_copy_file_to_dead_letter(
     assert (workspace["dead_letter"] / MOCKED_CSV_NAME).is_file()
 
 
-MODES = ["decision", "any_failure"]
+@pytest.mark.parametrize("action", [ActionName.MOVE, ActionName.COPY, ActionName.DELETE])
+def test_failed_validation_but_the_action_itself_fails(
+    workspace: Workspace,
+    make_runner: MakeRunner,
+    read_report: ReadReport,
+    monkeypatch: pytest.MonkeyPatch,
+    action: ActionName,
+) -> None:
+    """The data failed and the action was tried, but the storage refused: the report says so, the file is untouched.
+
+    The object was read and judged, so it is ``completed`` with decision ``FAILED``. It is the
+    action, not the object, that failed: ``ActionStatus.FAILED`` with the reason in ``error``.
+    """
+    (workspace["source"] / MOCKED_CSV_NAME).write_text(
+        "id,name\n1,a\n,b\n",
+        encoding="utf-8",
+    )
+    _deny_action(monkeypatch, action)
+
+    # `delete` takes no dead_letter, so the whole block is replaced rather than one key.
+    on_failure: dict[str, Any] = {"action": action}
+    if action != ActionName.DELETE:
+        on_failure["dead_letter"] = str(workspace["dead_letter"])
+    make_runner(on_failure=on_failure).run()
+    report = read_report()
+
+    [obj] = report["results"]
+    assert obj["status"] == RunObjectStatus.ABORTED
+    assert obj["error_type"] == PermissionError.__name__
+    assert obj["decision"] == Decision.FAILED
+    assert obj["action"]["action"] == action
+    assert obj["action"]["status"] == ActionStatus.FAILED
+
+    # The report says the action failed: check the filesystem agrees, nothing was done.
+    assert (workspace["source"] / MOCKED_CSV_NAME).is_file()
+    assert not (workspace["dead_letter"] / MOCKED_CSV_NAME).exists()
 
 
 class UnreadableCase(NamedTuple):
@@ -194,7 +266,7 @@ class UnreadableCase(NamedTuple):
     error_type: str
     mode: str
     # True when this mode acts on an unreadable file, so it ends up in the dead letter directory.
-    acted_on: bool
+    triggers_action: bool
     # True: the file is fine and the read itself is made to fail (an environmental error).
     deny_reads: bool = False
 
@@ -205,7 +277,7 @@ CASES_UNREADABLE = [
             content=b"id,name\n\xff\xfe,a\n",
             error_type=UnicodeDecodeError.__name__,
             mode="decision",
-            acted_on=False,
+            triggers_action=False,
         ),
         id="bytes_are_not_valid_utf8_in_decision_mode",
     ),
@@ -214,7 +286,7 @@ CASES_UNREADABLE = [
             content=b"id,name\n\xff\xfe,a\n",
             error_type=UnicodeDecodeError.__name__,
             mode="any_failure",
-            acted_on=True,
+            triggers_action=True,
         ),
         id="bytes_are_not_valid_utf8_in_any_failure_mode",
     ),
@@ -223,7 +295,7 @@ CASES_UNREADABLE = [
             content=b"id,name\n1,a\n2,b,extra,more\n",
             error_type="ParserError",
             mode="decision",
-            acted_on=False,
+            triggers_action=False,
         ),
         id="later_row_has_more_fields_than_header_in_decision_mode",
     ),
@@ -232,7 +304,7 @@ CASES_UNREADABLE = [
             content=b"id,name\n1,a\n2,b,extra,more\n",
             error_type="ParserError",
             mode="any_failure",
-            acted_on=True,
+            triggers_action=True,
         ),
         id="later_row_has_more_fields_than_header_in_any_failure_mode",
     ),
@@ -241,7 +313,7 @@ CASES_UNREADABLE = [
             content=b"id,name\n1,a\n",
             error_type=PermissionError.__name__,
             mode="decision",
-            acted_on=False,
+            triggers_action=False,
             deny_reads=True,
         ),
         id="permission_denied_in_decision_mode",
@@ -251,25 +323,12 @@ CASES_UNREADABLE = [
             content=b"id,name\n1,a\n",
             error_type=PermissionError.__name__,
             mode="any_failure",
-            acted_on=True,
+            triggers_action=True,
             deny_reads=True,
         ),
         id="permission_denied_in_any_failure_mode",
     ),
 ]
-
-
-def _deny_reads(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make every CSV read fail with ``PermissionError``.
-
-    A real permission error cannot be produced portably (Windows ignores chmod), so the
-    read itself is made to fail. Everything after it is the real code.
-    """
-
-    def deny(*args: Any, **kwargs: Any) -> None:
-        raise PermissionError("access denied")
-
-    monkeypatch.setattr("pandas.read_csv", deny)
 
 
 @pytest.mark.parametrize("case", CASES_UNREADABLE)
@@ -281,10 +340,12 @@ def test_unreadable_source_is_aborted_and_the_file_follows_mode(
     case: UnreadableCase,
 ) -> None:
     (workspace["source"] / MOCKED_CSV_NAME).write_bytes(case.content)
-    if case.deny_reads:
-        _deny_reads(monkeypatch)
 
-    make_runner(mode=case.mode).run()
+    runner = make_runner(mode=case.mode)
+    if case.deny_reads:
+        _deny_reads(monkeypatch, runner)
+
+    runner.run()
     report = read_report()
 
     # The report names the failure the same way in both modes.
@@ -299,8 +360,8 @@ def test_unreadable_source_is_aborted_and_the_file_follows_mode(
     assert report["run_status"] == RunStatus.ABORTED
 
     # Only the mode decides whether the file is touched.
-    assert (workspace["source"] / MOCKED_CSV_NAME).exists() is not case.acted_on
-    assert (workspace["dead_letter"] / MOCKED_CSV_NAME).exists() is case.acted_on
+    assert (workspace["source"] / MOCKED_CSV_NAME).exists() is not case.triggers_action
+    assert (workspace["dead_letter"] / MOCKED_CSV_NAME).exists() is case.triggers_action
 
 
 @pytest.mark.parametrize("case", CASES_UNREADABLE)
@@ -312,10 +373,12 @@ def test_unreadable_source_has_no_data_decision(
     case: UnreadableCase,
 ) -> None:
     (workspace["source"] / MOCKED_CSV_NAME).write_bytes(case.content)
-    if case.deny_reads:
-        _deny_reads(monkeypatch)
+    runner = make_runner(mode=case.mode)
 
-    make_runner(mode=case.mode).run()
+    if case.deny_reads:
+        _deny_reads(monkeypatch, runner)
+
+    runner.run()
     report = read_report()
 
     assert report["results"][0]["decision"] is None

@@ -8,11 +8,13 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 
 from cosmos.engines import Engine
+from cosmos.exceptions.data_error import SourceEmptyError
 from cosmos.gx.translation import GXTranslateExpectationResult
 from cosmos.gx.validator import GXValidator
 from cosmos.policy import CosmosPolicy, SourceObjectPolicy
 from cosmos.results import (
     ActionName,
+    ActionResult,
     ActionStatus,
     CosmosResult,
     Decision,
@@ -84,13 +86,13 @@ class Runner:
 
             try:
                 with self._timer() as duration:
-                    data = self.engine.load_data(file_path=source.path)
+                    engine = self.engine.model_copy().load_data(file_path=source.path)
 
                 read_duration_sec = duration()
-                statistics = self.engine.statistics(data=data)
+                statistics = engine.statistics()
 
                 with self._timer() as validation_duration:
-                    gx_result = GXValidator(config=self.validation).validate(df=data)
+                    gx_result = GXValidator(config=self.validation).validate(df=engine.dataframe)
 
                 validation_duration_sec = validation_duration()
 
@@ -102,9 +104,42 @@ class Runner:
                     expectation_results=cosmos_expectation_result
                 )
 
-                if action_result.action != ActionName.IGNORE:
-                    self.on_failure.handle(src=source.path)
-                    action_result.status = ActionStatus.COMPLETED
+                try:
+                    if action_result.action != ActionName.IGNORE:
+                        self.on_failure.handle(src=source.path)
+                        action_result.status = ActionStatus.COMPLETED
+                    error_type = None
+                    error_message = None
+                except PermissionError as e:
+                    logger.exception("permission denied while handling failure for %s", source.path)
+                    action_result.status = ActionStatus.FAILED
+                    error_type = type(e).__name__
+                    error_message = str(e)
+            except SourceEmptyError as e:
+                read_duration_sec = None
+                validation_duration_sec = None
+                gx_result = None
+                statistics = {"row_count": e.row_count, "column_count": e.column_count}
+                cosmos_expectation_result = []
+                decision = None
+                if self.source.on_empty == "skip":
+                    logger.warning("source %s is empty, skipped per on_empty=skip: %s", source.path, e)
+                    action_result = ActionResult(
+                        action=ActionName.IGNORE,
+                        status=ActionStatus.SKIPPED,
+                        dead_letter=None,
+                        error=None,
+                    )
+                    error_type = None
+                    error_message = None
+                else:
+                    logger.warning("source %s is empty and on_empty=fail: %s", source.path, e)
+                    action_result = SourceObjectPolicy(on_failure_config=self.on_failure).plan_action(Decision.FAILED)
+                    if action_result.action != ActionName.IGNORE:
+                        self.on_failure.handle(src=source.path)
+                        action_result.status = ActionStatus.COMPLETED
+                    error_type = type(e).__name__
+                    error_message = str(e)
             except Exception as e:
                 logger.exception("failed to process %s", source.path)
                 read_duration_sec = None
@@ -112,13 +147,15 @@ class Runner:
                 gx_result = None
                 statistics = {}
                 cosmos_expectation_result = []
-                decision = Decision.FAILED
+                decision = None
                 action_result = None
+                if self.on_failure.mode == "any_failure":
+                    action_result = SourceObjectPolicy(on_failure_config=self.on_failure).plan_action(Decision.FAILED)
+                    if action_result.action != ActionName.IGNORE:
+                        self.on_failure.handle(src=source.path)
+                        action_result.status = ActionStatus.COMPLETED
                 error_type = type(e).__name__
                 error_message = str(e)
-            else:
-                error_type = None
-                error_message = None
             finally:
                 raw_gx_result = gx_result.describe_dict() if gx_result is not None else None
                 source_object_results.append(

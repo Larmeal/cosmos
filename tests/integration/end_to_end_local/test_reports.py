@@ -120,8 +120,12 @@ CASES_REPORT_REFLECTS_SOURCE_STATE = [
             expected_result={
                 "status": RunObjectStatus.COMPLETED,
                 "row_count": None,
+                "column_count": None,
                 "error_type": None,
+                "decision": None,
+                "expectations": [],
             },
+            expected_run={"decision": None},
         ),
         id="zero_byte_with_on_empty_skip",
     ),
@@ -134,9 +138,21 @@ CASES_REPORT_REFLECTS_SOURCE_STATE = [
             expected_result={
                 "status": RunObjectStatus.ABORTED,
                 "row_count": None,
+                "column_count": None,
                 "error_type": SourceEmptyError.__name__,
+                "error_message": ANY,
+                "decision": None,
+                "expectations": [],
+                # on_empty=fail is recognized, not environmental: acted on regardless
+                # of on_failure.mode, same as any other Decision.FAILED.
+                "action": {
+                    "action": ActionName.MOVE,
+                    "status": ActionStatus.COMPLETED,
+                    "dead_letter": ANY,
+                    "error": None,
+                },
             },
-            expected_run={"run_status": RunStatus.ABORTED},
+            expected_run={"run_status": RunStatus.ABORTED, "decision": None},
         ),
         id="zero_byte_with_on_empty_fail",
     ),
@@ -146,6 +162,14 @@ CASES_REPORT_REFLECTS_SOURCE_STATE = [
             source_config={"on_empty": "skip"},
             on_failure_config={"mode": "decision"},
             rows=0,
+            expected_result={
+                "status": RunObjectStatus.COMPLETED,
+                "row_count": 0,
+                "error_type": None,
+                "decision": None,
+                "expectations": [],
+            },
+            expected_run={"decision": None},
         ),
         id="has_header_no_rows_on_empty_skip",
     ),
@@ -158,9 +182,18 @@ CASES_REPORT_REFLECTS_SOURCE_STATE = [
             expected_result={
                 "status": RunObjectStatus.ABORTED,
                 "row_count": 0,
-                "error_type": None,
+                "error_type": SourceEmptyError.__name__,
+                "error_message": ANY,
+                "decision": None,
+                "expectations": [],
+                "action": {
+                    "action": ActionName.MOVE,
+                    "status": ActionStatus.COMPLETED,
+                    "dead_letter": ANY,
+                    "error": None,
+                },
             },
-            expected_run={"run_status": RunStatus.ABORTED},
+            expected_run={"run_status": RunStatus.ABORTED, "decision": None},
         ),
         id="has_header_no_rows_on_empty_fail",
     ),
@@ -255,6 +288,3 @@ def test_report_reflects_source_state(
     report = read_report()
 
     assert report == _expected_report(case, source_file.resolve())
-
-
-# TODO: Implement the test to handle the cases

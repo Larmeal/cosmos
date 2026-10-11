@@ -71,13 +71,19 @@ class SourceObjectPolicy:
             return Decision.WARNED
         return Decision.PASSED
 
-    def _plan_action(self, decision_result: Decision) -> ActionResult:
-        """Derives the unexecuted action from the verdict and ``on_failure_config``.
+    def plan_action(self, decision_result: Decision) -> ActionResult:
+        """Derives the unexecuted action from a verdict and ``on_failure_config``.
 
         Only ``FAIL`` leads to a real action, and only when the config is not
         ``IgnoreFailureAction``; every other case returns ``IGNORE`` / ``SKIPPED``
         because nothing touches the file. The runner is what performs a
         ``PENDING`` action and updates its status afterwards.
+
+        Public (not just an internal step of ``decide()``): the runner also calls
+        this directly for an object whose decision was never computed from
+        expectations at all, such as ``SourceEmptyError`` or an ``any_failure``
+        abort, by passing ``Decision.FAILED`` in to select the action without
+        claiming that verdict actually happened.
         """
         if decision_result == Decision.FAILED and not isinstance(self.on_failure_config, IgnoreFailureAction):
             dead_letter = (
@@ -115,7 +121,7 @@ class SourceObjectPolicy:
             should carry out. Neither is stored on ``self``.
         """
         decision_result = self._make_decision(expectation_results)
-        action_result = self._plan_action(decision_result)
+        action_result = self.plan_action(decision_result)
 
         return decision_result, action_result
 
@@ -123,16 +129,25 @@ class SourceObjectPolicy:
 class CosmosPolicy:
     """Encapsulates the overall policy for handling source objects within COSMOS."""
 
-    def _make_decision(self, source_object_results: list[SourceObjectResult]) -> Decision:
-        """Determines the overall decision for a list of source object results."""
+    def _make_decision(self, source_object_results: list[SourceObjectResult]) -> Decision | None:
+        """Determines the overall decision for a list of source object results.
 
-        decisions = [result.decision for result in source_object_results]
+        ``None`` entries (nothing to judge: an aborted read, or an empty source) are
+        excluded from the worst-of reduction rather than counted as a pass. If every
+        object in the run is ``None``, the whole run never judged any data, so the
+        run-level decision is ``None`` too, instead of the vacuous ``PASSED`` a plain
+        reduction over an all-``None`` list would otherwise produce.
+        """
 
+        decisions = [result.decision for result in source_object_results if result.decision is not None]
+
+        if not decisions:
+            return None
         if Decision.FAILED in decisions:
             return Decision.FAILED
         if Decision.WARNED in decisions:
             return Decision.WARNED
         return Decision.PASSED
 
-    def decide(self, source_object_results: list[SourceObjectResult]) -> Decision:
+    def decide(self, source_object_results: list[SourceObjectResult]) -> Decision | None:
         return self._make_decision(source_object_results)

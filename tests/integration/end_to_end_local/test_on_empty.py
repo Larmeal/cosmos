@@ -1,4 +1,4 @@
-"""End-to-end: ``source.on_empty`` when the glob matches no file at all.
+"""End-to-end: ``source.on_empty`` when the source file is empty (zero bytes, or only a header).
 
 Local storage, pandas engine, local file sink.
 """
@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 import pytest
 
 from cosmos.exceptions.data_error import SourceEmptyError
-from cosmos.results import Decision, RunObjectStatus, RunStatus
+from cosmos.results import RunObjectStatus, RunStatus
 from cosmos.runner import Runner
 from tests.integration.end_to_end_local.test_on_failure import MOCKED_CSV_NAME
 
@@ -43,7 +43,7 @@ class Case(NamedTuple):
     expected_run: dict[str, Any]
 
 
-CASES_HAS_ONLY_HEADERS = [
+CASES_EMPTY_SOURCE = [
     pytest.param(
         Case(
             content=b"id,name\n",
@@ -69,35 +69,46 @@ CASES_HAS_ONLY_HEADERS = [
             expected_result={
                 "error_type": SourceEmptyError.__name__,
                 "status": RunObjectStatus.ABORTED,
-                "decision": Decision.FAILED,
+                "decision": None,
             },
             expected_run={
                 "run_status": RunStatus.ABORTED,
-                "decision": Decision.FAILED,
+                "decision": None,
             },
         ),
         id="has_only_headers_and_on_empty_fail",
     ),
-]
-
-CASES_ZERO_BYTES = [
     pytest.param(
         Case(
-            content=b"id,name\n",
+            content=b"",
             source_config={"on_empty": "skip"},
             rows=0,
-            expected_result={},
-            expected_run={},
+            expected_result={
+                "error_type": None,
+                "status": RunObjectStatus.COMPLETED,
+                "decision": None,
+            },
+            expected_run={
+                "run_status": RunStatus.COMPLETED,
+                "decision": None,
+            },
         ),
         id="zero_bytes_and_on_empty_skip",
     ),
     pytest.param(
         Case(
-            content=b"id,name\n",
+            content=b"",
             source_config={"on_empty": "fail"},
             rows=0,
-            expected_result={},
-            expected_run={},
+            expected_result={
+                "error_type": SourceEmptyError.__name__,
+                "status": RunObjectStatus.ABORTED,
+                "decision": None,
+            },
+            expected_run={
+                "run_status": RunStatus.ABORTED,
+                "decision": None,
+            },
         ),
         id="zero_bytes_and_on_empty_fail",
     ),
@@ -159,8 +170,8 @@ CASES_ZERO_BYTES = [
 # }
 
 
-@pytest.mark.parametrize("case", CASES_HAS_ONLY_HEADERS)
-def test_header_only_source_outcome_follows_on_empty(
+@pytest.mark.parametrize("case", CASES_EMPTY_SOURCE)
+def test_empty_source_outcome_follows_on_empty(
     workspace: Workspace,
     make_runner: MakeRunner,
     read_report: ReadReport,
@@ -178,24 +189,3 @@ def test_header_only_source_outcome_follows_on_empty(
     assert report["results"][0]["decision"] == case.expected_result["decision"]
     assert report["decision"] == case.expected_run["decision"]
     assert report["run_status"] == case.expected_run["run_status"]
-
-
-@pytest.mark.parametrize("case", CASES_ZERO_BYTES)
-def test_zero_byte_source_is_aborted_with_source_empty_error(
-    workspace: Workspace,
-    make_runner: MakeRunner,
-    read_report: ReadReport,
-    case: Case,
-) -> None:
-
-    source_file = workspace["source"] / MOCKED_CSV_NAME
-    source_file.write_bytes(case.content)
-
-    make_runner(on_empty=case.source_config["on_empty"]).run()
-
-    report = read_report()
-
-    print(report)
-
-    assert report["results"][0]["error_type"] == SourceEmptyError.__name__
-    assert report["results"][0]["status"] == RunObjectStatus.ABORTED
