@@ -20,10 +20,6 @@ MakeRunner = Callable[..., Runner]
 ReadReport = Callable[[], dict[str, Any]]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="policy ignores None: an aborted-only run reports PASSED, should be None",
-)
 def test_aborted_only_run_has_no_data_decision(
     workspace: Workspace,
     make_runner: MakeRunner,

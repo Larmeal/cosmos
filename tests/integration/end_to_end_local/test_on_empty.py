@@ -160,7 +160,7 @@ CASES_ZERO_BYTES = [
 
 
 @pytest.mark.parametrize("case", CASES_HAS_ONLY_HEADERS)
-def test_source_has_only_header(
+def test_header_only_source_outcome_follows_on_empty(
     workspace: Workspace,
     make_runner: MakeRunner,
     read_report: ReadReport,
@@ -180,13 +180,8 @@ def test_source_has_only_header(
     assert report["run_status"] == case.expected_run["run_status"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=SourceEmptyError,
-    reason="Zero bytes with on_empty skip/fail should always fail",
-)
 @pytest.mark.parametrize("case", CASES_ZERO_BYTES)
-def test_source_is_zero_bytes(
+def test_zero_byte_source_is_aborted_with_source_empty_error(
     workspace: Workspace,
     make_runner: MakeRunner,
     read_report: ReadReport,
@@ -204,6 +199,3 @@ def test_source_is_zero_bytes(
 
     assert report["results"][0]["error_type"] == SourceEmptyError.__name__
     assert report["results"][0]["status"] == RunObjectStatus.ABORTED
-
-
-# TODO: Implement the test to handle the cases
