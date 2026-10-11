@@ -196,7 +196,7 @@ CASES = [
 
 
 @pytest.mark.parametrize("case", CASES)
-def test_dict_deep_merge(case: Case) -> None:
+def test_dict_deep_merge_replaces_keys_by_name_at_any_depth(case: Case) -> None:
     result = dict_deep_merge(case.obj, case.replaced_key, case.deep_copy)
     assert result == case.expected
 
