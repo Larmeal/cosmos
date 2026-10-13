@@ -37,6 +37,12 @@ def dict_deep_merge(obj: dict, replaced_key: dict, deep_copy: bool = True) -> di
     """
 
     def _recusive_merge(obj: dict, replaced_key: dict) -> dict:
+        """Replace keys in ``obj`` in place, searching nested dicts for keys it lacks.
+
+        A key found at this level is replaced here, and the search for it stops,
+        so deeper copies of the same key are untouched. A key missing at this
+        level is searched for in every nested dict value.
+        """
         for r_key, r_value in replaced_key.items():
             if r_key in obj and isinstance(obj, dict):
                 obj[r_key] = r_value

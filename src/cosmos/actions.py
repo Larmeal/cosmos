@@ -8,9 +8,10 @@ from cosmos.storages import StorageBackend
 
 
 class BaseFailureAction(BaseModel, ABC):
-    """Base configuration for all failure actions.
+    """Base configuration for every failure action.
 
-    All actions need to know which storage they are operating on.
+    Holds the setting all actions share: the ``mode`` that decides which
+    outcomes make the action fire.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -64,9 +65,10 @@ class DeleteFailureAction(BaseFailureAction):
     )
 
     def handle(self, src: str) -> None:
-        """Handle the delete action.
+        """Delete the source file in place through the storage backend.
 
-        This method deletes the raw source file in-place using the provided storage backend.
+        Raises:
+            ValueError: No storage backend is set.
         """
 
         if self.backend is not None:
@@ -101,7 +103,7 @@ class RelocateFailureAction(BaseFailureAction):
     @field_validator("dead_letter", mode="after")
     @classmethod
     def validate_local_dead_letter_path(cls, value: str) -> str:
-        """Validator to ensure that dead_letter for local storage is not empty or root directory"""
+        """Strip trailing slashes from ``dead_letter``, rejecting an empty path or the root directory."""
 
         cleaned_path = value.rstrip("/")
         if not cleaned_path or cleaned_path == "/":
@@ -116,9 +118,10 @@ class MoveFailureAction(RelocateFailureAction):
     action: Literal[ActionName.MOVE] = Field(description="Action identifier, fixed to 'move'.")
 
     def handle(self, src: str) -> None:
-        """Handle the relocation action.
+        """Move the source file into ``dead_letter`` through the storage backend.
 
-        This method is intended to be overridden by subclasses that implement specific relocation actions.
+        Raises:
+            ValueError: No storage backend is set.
         """
         if self.backend is not None:
             self.backend.move_obj(src=src, dst_dir=self.dead_letter)
@@ -134,9 +137,10 @@ class CopyFailureAction(RelocateFailureAction):
     action: Literal[ActionName.COPY] = Field(description="Action identifier, fixed to 'copy'.")
 
     def handle(self, src: str) -> None:
-        """Handle the relocation action.
+        """Copy the source file into ``dead_letter`` through the storage backend, leaving the original.
 
-        This method is intended to be overridden by subclasses that implement specific relocation actions.
+        Raises:
+            ValueError: No storage backend is set.
         """
         if self.backend is not None:
             self.backend.copy_obj(src=src, dst_dir=self.dead_letter)

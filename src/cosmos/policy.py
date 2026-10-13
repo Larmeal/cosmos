@@ -13,16 +13,16 @@ from cosmos.results import (
 class SourceObjectPolicy:
     """Decides what a validation result means, and what should happen to the file.
 
-    Given the expectations checked against one source object, SourceObjectPolicy answers the
-    two questions the rest of the run needs:
+    Given the expectations checked against one source object, it answers the two
+    questions the rest of the run needs:
 
     ```
     was the data good?       -> Decision.PASSED / WARNED / FAILED
     what do we do about it?  -> an ActionResult naming the action to perform
     ```
 
-    Severity connects the two: a failure matters only as much as the contract
-    said it should.
+    Severity connects the two: a failure matters as much as the contract says
+    it does.
 
     ```
     a critical expectation failed  -> FAIL, and the configured on_failure action is planned (move, copy, delete)
@@ -31,37 +31,44 @@ class SourceObjectPolicy:
     ```
 
     Only FAIL ever touches the file. WARN and PASS are still written to the
-    report; they just do not move anything.
+    report, but they do not move anything.
 
-    SourceObjectPolicy is a brain with no hands. It never opens a file, relocates one, or
-    writes a report, and it keeps no per-object state: ``decide()`` takes one
-    object's results and returns the verdicts rather than storing them, so one
-    instance is built per run and reused, unchanged, for every object in it.
-    That is what lets this class be tested with nothing but a list of fabricated
-    ``ExpectationResult`` objects: no GX, no storage, no engine, no I/O.
+    SourceObjectPolicy is a brain with no hands. It never opens a file, relocates
+    one, or writes a report, and it keeps no per-object state: ``decide()`` takes
+    one object's results and returns the verdicts without storing them, so one
+    instance could serve every object in a run. It can therefore be tested with
+    nothing but a list of fabricated ``ExpectationResult`` objects: no GX, no
+    storage, no engine, no I/O.
 
-    The ``ActionResult`` it returns is only an intent: status is ``PENDING`` for
-    an action that will run, ``SKIPPED`` when there is nothing to do. The report
-    records that intent before the runner acts, so a row still at ``PENDING``
-    afterwards means the process died in between.
+    The ``ActionResult`` it returns is only an intent: its status is ``PENDING``
+    for an action that will run and ``SKIPPED`` when there is nothing to do. The
+    report records that intent before the runner acts, so a row still at
+    ``PENDING`` afterwards means the process died in between.
 
-    SourceObjectPolicy looks at one source object at a time, never at its neighbours. The
+    It looks at one source object at a time, never at its neighbours. The
     run-level verdicts (``run_status``, ``decision``) are rollups computed over
-    every object after the loop finishes, not something SourceObjectPolicy produces.
+    every object after the loop finishes; SourceObjectPolicy does not produce
+    them.
 
     Attributes:
         on_failure_config: What the config said to do with a file that fails.
     """
 
     def __init__(self, on_failure_config: OnFailureActionConfig) -> None:
+        """Prepare a policy for one pipeline.
+
+        Args:
+            on_failure_config: The pipeline's ``on_failure`` block, used only to
+                choose the action for a ``FAILED`` object.
+        """
         self.on_failure_config = on_failure_config
 
     def _make_decision(self, expectation_results: list[ExpectationResult]) -> Decision:
         """Reduces one object's expectation results to a verdict by worst severity.
 
         Only failures count, and a failed ``info`` expectation never lifts the
-        verdict above ``PASS``: it is recorded, but it exists to leave a note for
-        a person, not to gate anything.
+        verdict above ``PASS``. It is recorded as a note for a person and does
+        not change the outcome.
         """
         failures = [result for result in expectation_results if not result.success]
 
@@ -75,15 +82,15 @@ class SourceObjectPolicy:
         """Derives the unexecuted action from a verdict and ``on_failure_config``.
 
         Only ``FAIL`` leads to a real action, and only when the config is not
-        ``IgnoreFailureAction``; every other case returns ``IGNORE`` / ``SKIPPED``
-        because nothing touches the file. The runner is what performs a
-        ``PENDING`` action and updates its status afterwards.
+        ``IgnoreFailureAction``. Every other case returns ``IGNORE`` / ``SKIPPED``,
+        because nothing touches the file. The runner performs a ``PENDING``
+        action and updates its status afterwards.
 
-        Public (not just an internal step of ``decide()``): the runner also calls
-        this directly for an object whose decision was never computed from
-        expectations at all, such as ``SourceEmptyError`` or an ``any_failure``
-        abort, by passing ``Decision.FAILED`` in to select the action without
-        claiming that verdict actually happened.
+        This is public, not only a step inside ``decide()``, because the runner
+        also calls it directly for an object whose decision never came from
+        expectations, such as a ``SourceEmptyError`` or an ``any_failure``
+        abort. It passes ``Decision.FAILED`` to select the action without
+        claiming that verdict happened.
         """
         if decision_result == Decision.FAILED and not isinstance(self.on_failure_config, IgnoreFailureAction):
             dead_letter = (
@@ -108,9 +115,10 @@ class SourceObjectPolicy:
     def decide(self, expectation_results: list[ExpectationResult]) -> tuple[Decision, ActionResult]:
         """Turns one source object's expectation results into its two verdicts.
 
-        This is the only method the rest of COSMOS calls; the two helpers exist
-        to support it. Nothing is read, written or relocated here. The runner
-        records the decision and then performs the action if one is due.
+        This is the main entry point. The runner calls ``plan_action`` directly
+        only for objects that have no expectation results to judge. Nothing is
+        read, written or relocated here: the runner records the decision and
+        then performs the action if one is due.
 
         Args:
             expectation_results: Every expectation checked against this one source
@@ -127,16 +135,16 @@ class SourceObjectPolicy:
 
 
 class CosmosPolicy:
-    """Encapsulates the overall policy for handling source objects within COSMOS."""
+    """Rolls the per-object decisions up into the decision for the whole run."""
 
     def _make_decision(self, source_object_results: list[SourceObjectResult]) -> Decision | None:
         """Determines the overall decision for a list of source object results.
 
         ``None`` entries (nothing to judge: an aborted read, or an empty source) are
-        excluded from the worst-of reduction rather than counted as a pass. If every
-        object in the run is ``None``, the whole run never judged any data, so the
-        run-level decision is ``None`` too, instead of the vacuous ``PASSED`` a plain
-        reduction over an all-``None`` list would otherwise produce.
+        left out of the worst-of reduction instead of counting as a pass. If every
+        object's decision is ``None``, the run never judged any data, so the
+        run-level decision is ``None`` too, not the empty ``PASSED`` a plain
+        reduction over an all-``None`` list would produce.
         """
 
         decisions = [result.decision for result in source_object_results if result.decision is not None]
@@ -150,4 +158,13 @@ class CosmosPolicy:
         return Decision.PASSED
 
     def decide(self, source_object_results: list[SourceObjectResult]) -> Decision | None:
+        """The run-level decision: the worst decision across all objects.
+
+        ``FAILED`` if any object failed, otherwise ``WARNED`` if any warned,
+        otherwise ``PASSED``. Objects with no decision (aborted or empty) are
+        skipped, and if no object has a decision the result is ``None``.
+
+        Args:
+            source_object_results: Every object's result from this run.
+        """
         return self._make_decision(source_object_results)

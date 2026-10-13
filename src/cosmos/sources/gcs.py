@@ -26,7 +26,7 @@ class GCSSourceConfig(FileBaseConfig):
     @field_validator("file_path")
     @classmethod
     def validate_gcs_path(cls, value: str) -> str:
-        """Validate the GCS file path to ensure it starts with 'gs://'.
+        """Check that the GCS file path starts with 'gs://'.
 
         Args:
             value (str): The GCS file path to validate.

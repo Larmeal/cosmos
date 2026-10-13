@@ -13,8 +13,8 @@ class ConfigurationError(CosmosError):
     does not exist, or an action that the source kind does not support. Raised by
     the loader and by parse-time validators, before any data is read.
 
-    Retrying does not help: the file has to change. The run aborts and no source object
-    is validated.
+    Retrying does not help; the file has to change. The run aborts and no source
+    object is validated.
     """
 
 
@@ -25,7 +25,7 @@ class DataError(CosmosError):
     Raised by the reader once it recognises a failure as belonging to the data
     rather than to the environment.
 
-    The source object is recorded and dead-lettered according to ``on_failure``, and the
-    run continues with the remaining source objects: a partial run that is recorded
-    beats an aborted one that leaves the day missing from the report.
+    The source object is recorded and dead-lettered according to ``on_failure``, and
+    the run continues with the remaining source objects. A recorded partial run is
+    better than an aborted one that leaves the day missing from the report.
     """

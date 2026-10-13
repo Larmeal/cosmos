@@ -21,21 +21,21 @@ _SEVERITY_ORDER = (Severity.CRITICAL, Severity.WARNING, Severity.INFO)
 
 
 def _elide_path(path: str) -> str:
-    """Shortens a path for display by cutting from the left, not the right.
+    """Shortens a path for display by cutting from the left.
 
-    A path's most identifying part is its end: the file name, and usually the
-    parent folder or two above it. The shared prefix at the front ("the whole
-    project lives under C:/Users/.../cosmos/...") tells a reader nothing new
-    once they've seen it once, so that is the part that gets cut. A single
-    "…" character marks that something was removed.
+    The end of a path is what identifies it: the file name, and usually a
+    folder or two above it. The prefix at the front ("the whole project lives
+    under C:/Users/.../cosmos/...") tells the reader nothing new after the
+    first line, so that is the part to cut. A single "…" marks where text was
+    removed.
 
     Args:
         path: The path to shorten, as it would otherwise be printed.
 
     Returns:
-        ``path`` unchanged if it already fits within ``_PATH_WIDTH``
-        characters, otherwise its rightmost ``_PATH_WIDTH - 1`` characters
-        prefixed with "…".
+        ``path`` unchanged if it fits within ``_PATH_WIDTH`` characters,
+        otherwise its rightmost ``_PATH_WIDTH - 1`` characters prefixed with
+        "…".
 
     Example:
         A 79-character absolute path becomes::
@@ -43,14 +43,14 @@ def _elide_path(path: str) -> str:
             >>> _elide_path("C:/Users/armlo/.../cosmos/data/test_1.csv")
             '…t/personal-project/cosmos/data/test_1.csv'
 
-        while a short path like ``"data/test_1.csv"`` passes through
-        untouched, since it is already under the width limit.
+        A short path like ``"data/test_1.csv"`` is already under the width
+        limit and comes back unchanged.
 
     Note:
-        To show more or less of the path, change the module-level
-        ``_PATH_WIDTH`` constant; this function itself never needs to change
-        for that. It is used for both the object listing (``Plan._object_lines``)
-        and nowhere else, so widening it only affects that one column.
+        The width is the module-level ``_PATH_WIDTH`` constant, so changing
+        how much of the path shows never requires editing this function. The
+        only caller is the object listing (``Plan._object_lines``), so a new
+        width affects that one column.
     """
     if len(path) <= _PATH_WIDTH:
         return path
@@ -58,25 +58,25 @@ def _elide_path(path: str) -> str:
 
 
 def _relative_to_cwd(path: str) -> str:
-    """Rewrites a local path as relative to the current directory, best-effort.
+    """Rewrites a local path relative to the current directory, when it can.
 
     ``LocalStorage`` resolves every object's path to an absolute one (see
-    ``storages/local.py``), which is correct for identifying a file uniquely
-    but painful to read in a terminal: a plan run from the project root
-    should show ``data/test_1.csv``, not
+    ``storages/local.py``). That identifies a file uniquely but is hard to
+    read in a terminal: a plan run from the project root should show
+    ``data/test_1.csv``, not
     ``C:/Users/armlo/OneDrive/Desktop/Project/personal-project/cosmos/data/test_1.csv``.
-    This function undoes that resolution for display purposes only; the
-    ``source_object`` key COSMOS actually reports against is untouched,
-    since callers pass the original ``obj.path`` to everything else.
+    This function shortens the path for display only. Callers pass the
+    original ``obj.path`` everywhere else, so the ``source_object`` key the
+    report uses is unchanged.
 
     Args:
         path: An absolute (or otherwise non-relative) path or URI, as stored
             on ``SourceObjectMetadata.path``.
 
     Returns:
-        ``path`` rewritten relative to :func:`pathlib.Path.cwd`, or ``path``
-        unchanged when that would not help: a URI from another backend
-        (``gs://bucket/key`` has no filesystem meaning to relativize), or a
+        ``path`` relative to :func:`pathlib.Path.cwd`, or ``path`` unchanged
+        when that is not possible: a URI from another backend
+        (``gs://bucket/key`` has no filesystem location to relativize), or a
         local path outside the current tree (a different drive on Windows,
         or anywhere ``Path.relative_to`` would raise).
 
@@ -90,11 +90,11 @@ def _relative_to_cwd(path: str) -> str:
             'gs://my-bucket/data/test_1.csv'
 
     Note:
-        This is only ever called when ``Plan.render(full_path=False)``, the
-        default; pass ``full_path=True`` to skip it and show the path exactly
-        as stored. If a future storage backend needs its own notion of
-        "relative", branch on a URI scheme check here rather than adding a
-        second function; every call site already goes through this one.
+        Only called for ``Plan.render(full_path=False)``, the default; pass
+        ``full_path=True`` to show the path exactly as stored. If a future
+        storage backend needs its own notion of "relative", add a URI scheme
+        check here instead of a second function, since every call site
+        already goes through this one.
     """
     if "://" in path:
         return path
@@ -105,29 +105,22 @@ def _relative_to_cwd(path: str) -> str:
 
 
 def _human_size(size_bytes: float) -> str:
-    """Formats a byte count the way a person skimming a terminal reads it.
+    """Formats a byte count so a person scanning a terminal can judge it.
 
-    ``SourceObjectMetadata.size_bytes`` is a plain integer, exactly the way
-    ``os.stat`` reports it; nobody scanning a plan wants to mentally divide
-    that by a million to tell "is this file big". This walks it up through
-    B, KB, MB to GB, stopping at the first unit where the number is small
-    enough to read at a glance.
+    ``SourceObjectMetadata.size_bytes`` is the plain integer ``os.stat``
+    reports, and nobody reading a plan wants to divide it by a million to see
+    whether a file is big. This steps up through B, KB, MB and GB, stopping
+    at the first unit where the number is under 1024.
 
     Args:
         size_bytes: A non-negative byte count, usually ``obj.size_bytes`` or
             a sum of several.
 
     Returns:
-        The size rounded to the nearest unit: whole bytes for "B" (nobody
-        needs "410.0 B"), one decimal place everywhere above that
-        ("2.0 KB", "5.0 MB"), and everything at a gigabyte or larger is left
-        in GB even if that means more than three digits before the point.
-
-    Raises:
-        AssertionError: Never, in practice: every branch of the loop returns
-            before falling through, since "GB" always matches on its own
-            check. The line exists only so a type checker can see the
-            function always returns a ``str``.
+        The size with its unit: whole bytes for "B" ("410 B", never
+        "410.0 B"), and one decimal place above that ("2.0 KB", "5.0 MB").
+        Anything of a gigabyte or more stays in GB, even with more than three
+        digits before the point.
 
     Example:
         >>> _human_size(410)
@@ -138,8 +131,11 @@ def _human_size(size_bytes: float) -> str:
         '5.0 MB'
 
     Note:
-        To add a "TB" tier, extend the ``for unit in (...)`` tuple; the
-        division-by-1024 loop already generalizes to any number of units.
+        The final ``raise AssertionError`` is unreachable, because the "GB"
+        iteration always returns. It is there so a type checker can see that
+        the function always returns a ``str``. To add a "TB" tier, extend
+        the unit tuple; the divide-by-1024 loop already handles any number
+        of units.
     """
     for unit in ("B", "KB", "MB", "GB"):
         if size_bytes < 1024 or unit == "GB":
@@ -149,28 +145,27 @@ def _human_size(size_bytes: float) -> str:
 
 
 def _render_value(value: Any) -> str:
-    """Renders one config value roughly the way it looked in the YAML.
+    """Renders one config value roughly as it looked in the YAML.
 
-    Used for values that read best as a ``key="value"`` pair rather than
-    YAML's own block style, such as a source's reader ``options``
-    (``delimiter=","``). Every string is quoted here, unconditionally, which
-    is deliberate: this reads like a Python keyword argument, where quoting a
-    string is always correct and never ambiguous. Contrast this with
-    :func:`_render_kwarg_scalar`, used for the ``--full-rules`` block, which
-    quotes only when leaving a string bare would change its meaning; the two
-    exist side by side because they render two different notations.
+    Used for values shown as a ``key="value"`` pair, such as a source's
+    reader ``options`` (``delimiter=","``). Every string is quoted, because
+    the pair reads like a Python keyword argument, where a quoted string is
+    always correct and never ambiguous. :func:`_render_kwarg_scalar`, used for
+    the ``--full-rules`` block, quotes only when a bare string would change
+    meaning. The two functions exist side by side because they render two
+    different notations.
 
     Args:
         value: A single config value: a bool, string, list, number, or
             anything whose ``str()`` is already what should be shown.
 
     Returns:
-        ``"true"``/``"false"`` for a bool (checked before ``str``, since
-        ``isinstance(True, int)`` is also true in Python and would otherwise
-        print ``"1"``), a double-quoted string for ``str``, a
-        ``[item, item]`` rendering for a list (each item recursed into and
-        then unquoted, since a bracketed list already reads as one unit), or
-        ``str(value)`` for everything else (``int``, ``float``, ``None``).
+        ``"true"``/``"false"`` for a bool, a double-quoted string for a
+        ``str``, ``[item, item]`` for a list (each item rendered recursively
+        and then unquoted, since a bracketed list already reads as one unit),
+        or ``str(value)`` for anything else (``int``, ``float``, ``None``).
+        A bool is checked first so it renders as YAML's ``true`` instead of
+        falling through to ``str(value)`` as ``"True"``.
 
     Example:
         >>> _render_value(True)
@@ -183,11 +178,11 @@ def _render_value(value: Any) -> str:
         '0'
 
     Note:
-        To render a new value shape (a dict, say), add a branch here before
-        the final ``str(value)`` fallback; every caller in this module (the
+        To render a new value shape (a dict, say), add a branch before the
+        final ``str(value)`` fallback. Both callers in this module (the
         source options in ``Plan._source_box`` and the scalar fallback in
-        ``_render_kwarg_scalar``) goes through this one function, so the
-        change reaches both at once.
+        ``_render_kwarg_scalar``) go through this function, so the change
+        reaches both.
     """
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -204,25 +199,24 @@ _TIMESTAMP_LIKE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 def _needs_quotes(value: str) -> bool:
     """Whether writing this string bare, as plain YAML, would change its meaning.
 
-    ``--full-rules`` renders each expectation's ``kwargs`` to look like a
-    hand-written YAML file (see ``Plan._rule_lines``), and in real YAML most
-    strings are written without quotes: ``column: col_int64``, not
-    ``column: "col_int64"``. But a handful of strings are only strings
-    because Python says so; a YAML *reader* looking at the same bare text
-    would parse it as a bool, a number, or a timestamp instead. This function
-    is the check for exactly those cases, so the renderer knows when it has
-    to quote to keep the value a string.
+    ``--full-rules`` renders each expectation's ``kwargs`` like a hand-written
+    YAML file (see ``Plan._rule_lines``), and in real YAML most strings have
+    no quotes: ``column: col_int64``, not ``column: "col_int64"``. Some
+    strings, though, are strings only on the Python side; a YAML parser
+    reading the same bare text would get a bool, a number or a timestamp.
+    This function detects those cases, so the renderer knows when it must
+    quote to keep the value a string.
 
     Args:
         value: The exact text that would otherwise be written bare.
 
     Returns:
-        True when leaving ``value`` unquoted would be misread by a YAML
-        parser: it is empty or has leading/trailing whitespace, it spells a
-        bool or null (``"true"``, ``"None"``, ``"~"``, case-insensitively),
-        it parses as a number (``float(value)`` succeeds), or it starts with
-        a ``YYYY-MM-DD`` date. False for an ordinary identifier like a
-        column name, which reads better, and is unambiguous, left bare.
+        True when a YAML parser would misread ``value`` unquoted: it is empty
+        or has leading/trailing whitespace, it spells a bool or null
+        (``"true"``, ``"None"``, ``"~"``, case-insensitively), it parses as a
+        number (``float(value)`` succeeds), or it starts with a
+        ``YYYY-MM-DD`` date. False for an ordinary identifier like a column
+        name, which is unambiguous and reads better bare.
 
     Example:
         >>> _needs_quotes("col_int64")
@@ -235,12 +229,11 @@ def _needs_quotes(value: str) -> bool:
         True
 
     Note:
-        This only has to cover shapes that actually appear in a GX
-        expectation's ``kwargs`` today (dates, numbers-as-strings, and
-        so on). If a future expectation's kwargs introduce a new ambiguous
-        shape (say, a string that looks like a YAML list, ``"[1, 2]"``), add
-        a check for it here; ``_render_kwarg_scalar`` is the only caller and
-        needs no change itself.
+        This covers the shapes that appear in GX expectation ``kwargs`` today
+        (dates, numbers as strings, and so on). If a future expectation adds
+        a new ambiguous shape (a string that looks like a YAML list,
+        ``"[1, 2]"``, say), add a check for it here. ``_render_kwarg_scalar``
+        is the only caller and needs no change.
     """
     if value == "" or value.strip() != value:
         return True
@@ -258,13 +251,13 @@ def _needs_quotes(value: str) -> bool:
 def _render_kwarg_scalar(value: Any) -> str:
     """Renders one kwarg value the way a hand-written YAML file would.
 
-    This is the ``--full-rules`` counterpart to ``_render_value``: same job,
-    different notation. ``_render_value`` always quotes a string (it is
-    rendering a Python-style ``key="value"`` pair); this instead quotes only
-    when :func:`_needs_quotes` says leaving it bare would be misread, so a
-    column name like ``col_int64`` reads the way it does in the source YAML.
-    Non-string values (bools, numbers) delegate straight to ``_render_value``,
-    since those never have this ambiguity.
+    The ``--full-rules`` counterpart to ``_render_value``: the same job in a
+    different notation. ``_render_value`` always quotes a string, because it
+    renders a Python-style ``key="value"`` pair. This function quotes only
+    when :func:`_needs_quotes` says a bare string would be misread, so a
+    column name like ``col_int64`` looks the way it does in the source YAML.
+    Non-string values (bools, numbers) go straight to ``_render_value``,
+    since they have no such ambiguity.
 
     Args:
         value: One value from an expectation's ``kwargs`` dict, e.g. the
@@ -273,7 +266,7 @@ def _render_kwarg_scalar(value: Any) -> str:
     Returns:
         The bare string when it is unambiguous, a double-quoted string when
         it is not, or ``_render_value(value)`` for anything that is not a
-        string at all.
+        string.
 
     Example:
         >>> _render_kwarg_scalar("col_int64")
@@ -286,11 +279,10 @@ def _render_kwarg_scalar(value: Any) -> str:
         '5'
 
     Note:
-        Called once per non-``column_list`` value by ``_render_kwargs_lines``;
-        it never needs to know about that caller's indentation or the
-        ``key:`` prefix, only the value itself, which keeps it easy to reuse
-        if another part of the plan ever wants the same YAML-flavored
-        rendering.
+        ``_render_kwargs_lines`` calls this once for each value other than
+        ``column_list``. It needs only the value, not the caller's
+        indentation or ``key:`` prefix, so another part of the plan could
+        reuse it for the same YAML-style rendering.
     """
     if isinstance(value, str):
         return f'"{value}"' if _needs_quotes(value) else value
@@ -300,28 +292,27 @@ def _render_kwarg_scalar(value: Any) -> str:
 def _render_kwargs_lines(kwargs: dict[str, Any], indent: str) -> list[str]:
     """Renders one expectation's kwargs, YAML-shaped, under the given indent.
 
-    This is the body of a single rule's ``kwargs:`` block in ``--full-rules``
-    output. It walks the kwargs dict in the order it was declared (a
-    ``dict`` preserves that, and so does PyYAML's loader), and renders each
-    key on its own line, the same "key: value" shape the source YAML used.
-    ``column_list`` is the one exception: since
-    ``expect_table_columns_to_match_ordered_list`` is about the columns'
-    *order*, that list explodes into one bare item per line rather than the
-    single-line ``[a, b, c]`` every other list would get, so the order is
-    something a reader can actually see rather than infer from a bracket.
+    This is the body of one rule's ``kwargs:`` block in ``--full-rules``
+    output. Keys appear in declaration order (a ``dict`` preserves it, and so
+    does PyYAML's loader), each on its own line as ``key: value``, the same
+    shape as the source YAML. ``column_list`` is the exception. It belongs to
+    ``expect_table_columns_to_match_ordered_list``, which checks the columns'
+    *order*, so the list is written one bare item per line instead of the
+    one-line ``[a, b, c]`` any other list gets. That way a reader sees the
+    order instead of inferring it from a bracket.
 
     Args:
         kwargs: One expectation's ``kwargs`` dict, e.g.
             ``{"column": "col_int64", "min_value": 0, "max_value": 5}``.
-        indent: The literal whitespace prefix for every line this returns,
-            already computed by the caller to line up under that rule's
-            number (see ``Plan._rule_lines``).
+        indent: The literal whitespace prefix for every returned line, which
+            the caller computes to line up under the rule's number (see
+            ``Plan._rule_lines``).
 
     Returns:
-        One line per key, each already prefixed with ``indent``, ready to be
-        extended straight onto the growing list of plan lines. A
-        ``column_list`` key contributes a ``"column_list:"`` line plus one
-        ``"  - <name>"`` line per column, indented two further spaces.
+        One line per key, each prefixed with ``indent``, ready to append to
+        the plan's lines. A ``column_list`` key adds a ``"column_list:"``
+        line plus one ``"  - <name>"`` line per column, indented two more
+        spaces.
 
     Example:
         >>> _render_kwargs_lines(
@@ -331,14 +322,13 @@ def _render_kwargs_lines(kwargs: dict[str, Any], indent: str) -> list[str]:
         ['          column: col_int64', '          min_value: 0', '          max_value: 5']
 
     Note:
-        The ``column_list`` special case is hardcoded by key name rather than
-        by shape (e.g. "any list longer than N items"), because it is the
-        only GX kwarg where order is the point of the expectation; every
-        other list-valued kwarg (``value_set``, say) is unordered and reads
-        fine as ``_render_value``'s ``[true, false]``. If a future
-        expectation needs the same one-per-line treatment, add its key
-        alongside ``"column_list"`` in the condition below rather than
-        switching to a general "explode all lists" rule.
+        ``column_list`` is matched by key name, not by shape (such as "any
+        list longer than N items"), because it is the only GX kwarg where
+        order is the point of the expectation. Other list-valued kwargs
+        (``value_set``, say) are unordered and read fine as
+        ``_render_value``'s ``[true, false]``. If a future expectation needs
+        one item per line, add its key next to ``"column_list"`` in the
+        condition below instead of exploding every list.
     """
     lines: list[str] = []
     for key, value in kwargs.items():
@@ -351,33 +341,31 @@ def _render_kwargs_lines(kwargs: dict[str, Any], indent: str) -> list[str]:
 
 
 def _box(title: str, rows: list[tuple[str, str]]) -> list[str]:
-    """Draws one titled box, every box the same width so they stack cleanly.
+    """Draws one titled box. Every box has the same width, so they stack cleanly.
 
-    This is the one drawing routine every section of the plan goes through
-    (``source``, ``validate``, ``on failure``, ``report``); nothing else in
-    the file builds a box border by hand. A "row" is a ``(label, value)``
-    pair. Two things are worth knowing about how it lays them out:
+    Every section of the plan (``source``, ``validate``, ``on failure``,
+    ``report``) is drawn by this function; nothing else in the file builds a
+    box border. A row is a ``(label, value)`` pair, laid out by two rules:
 
-    1. Every row's colon lines up under the *box's* longest label (not the
-       whole plan's), one space after it, so ``storage``, ``reader`` and
-       ``options`` in the source box all get their ``:`` at the same column
-       even though the labels are different lengths.
-    2. A row whose label is ``""`` is a *continuation* of the row above it,
-       used when one logical value spans several lines (a wrapped list of
-       reader options, or the per-severity rule counts). It gets no label or
-       colon of its own, just enough leading whitespace to land under where
-       the first line's value began, so the whole block reads as one item.
+    1. Each row's colon sits one space after the longest label in *this* box
+       (not the whole plan), so ``storage``, ``reader`` and ``options`` in
+       the source box share one colon column despite their different
+       lengths.
+    2. A row labelled ``""`` continues the row above it, for one value that
+       spans several lines (a wrapped list of reader options, or the
+       per-severity rule counts). It has no label or colon, only enough
+       leading whitespace to start under the first line's value, so the
+       block reads as one item.
 
     Args:
         title: The box's name, shown in its top border (``"╭─ source ─..."``).
         rows: The box's content, top to bottom. At least one row must have a
-            non-empty label, since that is what fixes the column the colons
-            align to.
+            non-empty label, because the longest label sets the colon column.
 
     Returns:
-        The box as a list of already-bordered, already-padded lines: a top
-        border, one line per row, and a bottom border. Every line is exactly
-        ``_BOX_WIDTH`` characters, so boxes stack without a ragged right edge.
+        The box as a list of bordered, padded lines: a top border, one line
+        per row, and a bottom border. Every line is exactly ``_BOX_WIDTH``
+        characters, so stacked boxes have a straight right edge.
 
     Example:
         >>> for line in _box("on failure", [("action", "move"), ("dead letter", "output/dead-letters")]):
@@ -388,11 +376,11 @@ def _box(title: str, rows: list[tuple[str, str]]) -> list[str]:
         ╰────────────────────────────────────────────────────────────────────────────╯
 
     Note:
-        To change the box's total width, edit the module-level ``_BOX_WIDTH``
+        To change the total width, edit the module-level ``_BOX_WIDTH``
         constant, not this function. To change the alignment rule itself
-        (say, left-aligning values instead of aligning colons), this is the
-        only function that needs to change; every ``Plan._*_box`` method
-        just builds ``rows`` and hands them here.
+        (left-aligning values instead of aligning colons, say), this is the
+        only function to edit; every ``Plan._*_box`` method just builds
+        ``rows`` and passes them here.
     """
     head = f"╭─ {title} "
     lines = [head + "─" * (_BOX_WIDTH - len(head) - 1) + "╮"]
@@ -411,20 +399,19 @@ def _box(title: str, rows: list[tuple[str, str]]) -> list[str]:
 
 @dataclass
 class Plan:
-    """What the run will do, resolved against reality but with nothing executed.
+    """What the run will do, resolved against reality, with nothing executed.
 
-    Config alone cannot answer "which files will this touch", and the file list
-    alone cannot answer "what will happen to them". Plan is the two together,
-    which is what makes it worth rendering before a run rather than after.
+    The config alone cannot say which files a run will touch, and the file
+    list alone cannot say what will happen to them. ``Plan`` holds both,
+    which is why it is worth rendering before a run instead of after.
 
-    A ``Plan`` is a plain ``@dataclass``, not a Pydantic model, even though
-    every field it holds (``source``, ``contract``, ...) is itself a
-    validated Pydantic model. That is deliberate: those sub-models already
-    ran their validators once, when the engine's YAML was loaded, and a
-    dataclass never re-runs them, whereas nesting an already-validated model
-    inside another ``BaseModel`` can re-trigger its ``model_validator``\\ s
-    unexpectedly. ``Plan`` only ever reads its fields; it is a snapshot, not
-    something a caller is expected to construct by hand except in a test.
+    ``Plan`` is a plain ``@dataclass``, not a Pydantic model, although every
+    field it holds (``source``, ``contract``, ...) is a validated Pydantic
+    model. Those models already ran their validators once, when the engine's
+    YAML was loaded. A dataclass never re-runs them, whereas nesting a
+    validated model inside another ``BaseModel`` can re-trigger its
+    ``model_validator``\\ s unexpectedly. ``Plan`` only reads its fields: it
+    is a snapshot, and only a test should construct one by hand.
 
     Attributes:
         engine_id: The pipeline's stable ``id``, shown in the header.
@@ -437,10 +424,8 @@ class Plan:
         source_objects: What the glob actually found, sorted by path.
 
     Example:
-        Ordinarily built by ``Planner.plan()``, never by hand, but nothing
-        stops a test from constructing one directly with fabricated data,
-        which is how this file's own edge cases (an empty glob, 30 objects
-        needing truncation) get exercised without touching a real filesystem::
+        ``Planner.plan()`` normally builds it, but a test can construct one
+        directly from fabricated data, without touching a real filesystem::
 
             >>> plan = Plan(
             ...     engine_id="test_config",
@@ -465,40 +450,37 @@ class Plan:
     source_objects: list[SourceObjectMetadata]
 
     def ordered_expectations(self) -> list[ExpectationConfig]:
-        """Every rule, severity first and declaration order within each severity.
+        """Every rule, ordered by severity and then by declaration order.
 
-        This is the single source of truth for "what order do the rules
-        appear in", used by both ``_rule_lines`` (numbering ``--full-rules``)
-        and eventually anywhere else that needs to say "rule 4" and mean the
-        same rule every time (a report, a log line). It is a public method,
-        not a leading-underscore helper, precisely so those other callers can
-        reuse it instead of re-deriving the same order by hand.
+        This is the single definition of rule order. ``_rule_lines`` uses it
+        to number ``--full-rules`` output, and anything else that needs
+        "rule 4" to mean the same rule every time (a report, a log line)
+        should use it too. It is public, with no leading underscore, so those
+        callers can reuse it instead of re-deriving the order.
 
-        Both keys the ordering depends on (a rule's ``severity``, and its
-        position in ``self.contract.expectations``) come from the config
-        alone, never from anything resolved at plan time. That is what makes
-        the order deterministic: running the same contract through this
-        twice, or on two different machines, always numbers the rules
-        identically.
+        Both sort keys (a rule's ``severity`` and its position in
+        ``self.contract.expectations``) come from the config alone, never
+        from anything resolved at plan time. So the order is deterministic:
+        the same contract numbers its rules identically on every run and on
+        every machine.
 
         Returns:
             Every expectation in ``self.contract.expectations``, grouped by
             severity in the order ``critical``, ``warning``, ``info``
-            (``_SEVERITY_ORDER``), and in declaration order within each
-            group. The list is a new one; the contract's own list is left
-            untouched.
+            (``_SEVERITY_ORDER``), in declaration order within each group.
+            The list is new; the contract's own list is not modified.
 
         Example:
             A contract declaring ``[warning_rule, critical_rule]`` (in that
-            order) returns ``[critical_rule, warning_rule]``: severity always
-            wins over declaration order, even though ``critical_rule`` was
+            order) returns ``[critical_rule, warning_rule]``. Severity wins
+            over declaration order, even though ``critical_rule`` was
             written second.
 
         Note:
-            To change the severity ordering itself (say, ``info`` before
-            ``warning``), edit the module-level ``_SEVERITY_ORDER`` tuple;
-            this method and everything that calls it adapts automatically,
-            since none of them hardcode the three names.
+            To change the severity order (``info`` before ``warning``, say),
+            edit the module-level ``_SEVERITY_ORDER`` tuple. Neither this
+            method nor its callers hardcode the three names, so they all
+            follow automatically.
         """
         ordered: list[ExpectationConfig] = []
         for severity in _SEVERITY_ORDER:
@@ -508,21 +490,19 @@ class Plan:
     def _source_box(self) -> list[str]:
         """Builds the ``╭─ source ─...`` box: where the data comes from.
 
-        Assembles the rows for storage, reader, options and glob pattern into
-        the shape ``_box`` expects, then hands them off; this method owns no
-        drawing logic of its own; it turns ``self.source`` (a ``SourceConfig``)
-        into ``(label, value)`` pairs.
+        Turns ``self.source`` (a ``SourceConfig``) into ``(label, value)``
+        rows for storage, reader, options, glob pattern and ``on_empty``,
+        then passes them to ``_box``. This method does no drawing itself.
 
         Returns:
-            The finished, bordered box as a list of lines (see ``_box``).
-            Each reader option becomes its own row (``options`` on the first,
-            an empty label continuing it on the rest), so
-            ``{"delimiter": ",", "encoding": "utf-8"}`` renders as two lines,
-            one option each, not packed onto one.
+            The bordered box as a list of lines (see ``_box``). Each reader
+            option gets its own row (``options`` on the first, an empty label
+            on the rest), so ``{"delimiter": ",", "encoding": "utf-8"}``
+            renders as two lines, one option each.
 
         Example:
-            For a CSV source with two options and a wildcard pattern, this
-            returns a box whose rows read (label, value) as::
+            For a CSV source with two options and a wildcard pattern, the
+            box's rows read (label, value) as::
 
                 ("storage", "local")
                 ("reader", "pandas.read_csv")
@@ -532,10 +512,9 @@ class Plan:
                 ("on_empty", "skip")
 
         Note:
-            To show a new source field (say, a future ``compression``
-            option), add a row to the ``rows`` list here; ``_box`` handles
-            the alignment for whatever rows it is given, with no changes
-            needed there.
+            To show a new source field (a future ``compression`` option,
+            say), add a row to ``rows`` here. ``_box`` aligns whatever rows
+            it is given, so it needs no change.
         """
         rows = [
             ("storage", self.source.storage),
@@ -551,33 +530,31 @@ class Plan:
     def _object_lines(self, full: bool, full_path: bool, tz: ZoneInfo) -> list[str]:
         """Lists the resolved source objects: what the glob actually found.
 
-        This is the one part of the plan that reports on reality rather than
-        declaration: ``self.source_objects`` came from an actual
+        This is the only part of the plan that reports on reality instead of
+        the declaration. ``self.source_objects`` came from a real
         ``backend.glob()`` call (see ``Planner.prepare_source_metadata``), so
-        this can say "12 objects, 5.1 KB" instead of "however many files
-        happen to match, whenever the run actually starts". It sits outside
-        any ``╭─...╮`` box on purpose (compare ``_source_box``): a list of an
-        arbitrary, possibly large number of files does not fit the
-        fixed-width row format the boxes use.
+        the plan can say "12 objects, 5.1 KB" instead of "however many files
+        match when the run starts". It sits outside the ``╭─...╮`` boxes
+        (compare ``_source_box``) because a list of arbitrarily many files
+        does not fit their fixed-width rows.
 
         Args:
             full: List every object instead of only the first
-                ``_OBJECT_PREVIEW`` (5), with a leading index number on each
-                line. Corresponds to the CLI's future ``--full-objects``.
+                ``_OBJECT_PREVIEW`` (5), with an index number on each line.
+                Backs the CLI's future ``--full-objects`` flag.
             full_path: Show each object's path exactly as stored (absolute,
                 for local files) instead of relative to the current
                 directory. See ``_relative_to_cwd``.
-            tz: The zone to render each object's ``modified_at`` timestamp in,
-                already resolved by ``render()`` from its ``timezone``
+            tz: The zone to render each object's ``modified_at`` timestamp
+                in, already resolved by ``render()`` from its ``timezone``
                 argument.
 
         Returns:
-            Lines to insert into the plan, starting with a blank line and a
-            summary ("N objects resolved · size"), followed by one line per
-            listed object, and (when ``full`` is False and there are more
-            than ``_OBJECT_PREVIEW``) a final "… N more" line. Returns just
-            a "0 objects resolved" line, with no summary or listing, when the
-            glob matched nothing.
+            Lines to insert into the plan: a blank line, a summary line
+            ("N objects resolved · size"), a blank line, one line per listed
+            object, and, when ``full`` is False and there are more than
+            ``_OBJECT_PREVIEW`` objects, a final "… N more" line. When the
+            glob matched nothing, only a blank line and "0 objects resolved".
 
         Example:
             With ``full=False`` and three objects found::
@@ -589,10 +566,10 @@ class Plan:
                       data/test_3.csv                410 B   modified 2026-05-23 15:28
 
         Note:
-            The preview size is the module-level ``_OBJECT_PREVIEW``
-            constant, and each path's column width is ``_PATH_WIDTH``
-            (via ``_elide_path``); adjust those rather than the layout
-            arithmetic in this method.
+            The preview count is the module-level ``_OBJECT_PREVIEW``
+            constant, and the path column width is ``_PATH_WIDTH`` (through
+            ``_elide_path``). Adjust those instead of the layout arithmetic
+            in this method.
         """
         total = len(self.source_objects)
         total_size = sum(obj.size_bytes for obj in self.source_objects)
@@ -616,24 +593,23 @@ class Plan:
         return lines
 
     def _validate_box(self) -> list[str]:
-        """Builds the ``╭─ validate ─...`` box: the contract, in summary.
+        """Builds the ``╭─ validate ─...`` box: the contract, summarized.
 
-        Shows counts only (a "9 totals / 8 critical / 1 warning" breakdown),
-        never the rules themselves; that is deliberately left to
-        ``_rule_lines`` (only shown when ``--full-rules`` is passed), since
-        the counts fit in a fixed-height box and a rule list does not. The
-        per-severity rows are built the same "continuation row" way as
-        ``_source_box``'s options: a first row with the ``rules`` label, then
-        one unlabeled row per severity that has at least one rule, so
-        ``_box`` lines the counts up under "N totals" automatically.
+        Shows counts only ("9 totals", then "8 critical" and "1 warning"),
+        never the rules themselves. The rules are left to ``_rule_lines``,
+        shown only with ``--full-rules``, because counts fit in a
+        fixed-height box and a rule list does not. The per-severity rows are
+        continuation rows, like the options in ``_source_box``: a first row
+        labelled ``rules``, then one unlabelled row per severity that has at
+        least one rule, which ``_box`` lines up under "N totals".
 
         Returns:
-            The finished, bordered box (see ``_box``). A severity with zero
-            rules gets no row at all: a contract with only critical rules
-            shows no "0 warning" line.
+            The bordered box (see ``_box``). A severity with no rules gets no
+            row, so a contract with only critical rules shows no "0 warning"
+            line.
 
         Example:
-            For a contract with 8 critical and 1 warning rule, the rows
+            For a contract with 8 critical rules and 1 warning rule, the rows
             (label, value) read::
 
                 ("contract", "test_1_schema")
@@ -643,10 +619,9 @@ class Plan:
                 ("data docs", "disabled")
 
         Note:
-            The severities iterated here come from the module-level
-            ``_SEVERITY_ORDER``, same as everywhere else in the file; adding
-            a fourth severity there is the only change needed for it to show
-            up here too.
+            The severities come from the module-level ``_SEVERITY_ORDER``, as
+            everywhere else in the file. Adding a fourth severity there is
+            all it takes for it to appear here.
         """
         total = len(self.contract.expectations)
         noun = "total" if total == 1 else "totals"
@@ -663,26 +638,25 @@ class Plan:
         return _box("validate", rows)
 
     def _rule_lines(self) -> list[str]:
-        """Every rule, numbered and grouped by severity, kwargs shown YAML-style.
+        """Every rule, numbered and grouped by severity, with kwargs shown YAML-style.
 
-        Only called when ``render(full_rules=True)``; the default plan shows
-        just ``_validate_box``'s counts, since 12 multi-line rule blocks is a
-        lot to put in front of someone who only wants to know "does this
-        plan look right". Each rule renders like an entry from the original
-        contract YAML (``expectation_type:`` then an indented ``kwargs:``
-        block, via ``_render_kwargs_lines``), except the ``-`` a plain YAML
-        list would use is replaced by the rule's number. That makes a rule
-        addressable the same way whether you are reading the plan or a
-        report ("rule 4 failed" means the same rule in both), which plain
-        ``-`` bullets, or names alone (not every rule has one), cannot do.
+        Only called for ``render(full_rules=True)``. The default plan shows
+        just ``_validate_box``'s counts, because twelve multi-line rule
+        blocks is a lot to show someone who only wants to know whether the
+        plan looks right. Each rule renders like an entry in the contract
+        YAML (``expectation_type:``, then an indented ``kwargs:`` block from
+        ``_render_kwargs_lines``), except that the rule's number replaces the
+        ``-`` of a YAML list. The number makes a rule addressable the same
+        way in the plan and in a report ("rule 4 failed" means the same rule
+        in both). Plain ``-`` bullets cannot do that, and neither can names,
+        since not every rule has one.
 
         Returns:
-            Lines to insert into the plan: for each severity that has at
-            least one rule, a blank line, a "<severity> · N rules" header,
-            then each rule as a blank line, its numbered
-            ``expectation_type:`` line, and (if it has any) an indented
-            ``kwargs:`` block. Returns an empty list if the contract has no
-            expectations at all.
+            Lines to insert into the plan. For each severity with at least
+            one rule: a blank line and a "<severity> · N rules" header, then
+            for each rule a blank line, its numbered ``expectation_type:``
+            line, and an indented ``kwargs:`` block if it has kwargs. Empty
+            if the contract has no expectations.
 
         Example:
             A single ``expect_column_values_to_not_be_null`` critical rule
@@ -695,10 +669,9 @@ class Plan:
                             column: col_int64
 
         Note:
-            Numbering restarts at 1 and counts up across every severity
-            group in one pass (it does not reset per group), which is why
-            ``number`` is declared once, outside the ``for severity`` loop,
-            and only ever incremented, never reset.
+            Numbering starts at 1 and continues across every severity group
+            without resetting, which is why ``number`` is declared once,
+            outside the ``for severity`` loop, and only ever incremented.
         """
         ordered = self.ordered_expectations()
         if not ordered:
@@ -727,18 +700,17 @@ class Plan:
         """Builds the ``╭─ on failure ─...`` box: what happens to a bad file.
 
         ``self.on_failure`` is a discriminated union (``IgnoreFailureAction``,
-        ``DeleteFailureAction``, ``RelocateFailureAction``, ...), and only
-        ``RelocateFailureAction`` (COSMOS's ``move``/``copy``) has a
-        destination worth showing; every other action's ``action`` field
-        alone already says everything there is to say. That is why this is
-        an ``isinstance`` check rather than a fixed set of rows: the box has
-        one row for ``action: ignore`` or ``action: delete``, and two for
-        ``action: move``, without ``_box`` needing to know why.
+        ``DeleteFailureAction``, ``RelocateFailureAction``, ...). Only
+        ``RelocateFailureAction`` (``move``/``copy``) has a destination worth
+        showing; for every other action the ``action`` field says
+        everything. So this is an ``isinstance`` check instead of a fixed set
+        of rows: one row for ``action: ignore`` or ``action: delete``, two
+        for ``action: move``, and ``_box`` does not need to know why.
 
         Returns:
-            The finished, bordered box (see ``_box``): always an ``action``
-            row, plus a ``dead letter`` row only when ``self.on_failure`` is
-            a ``RelocateFailureAction``.
+            The bordered box (see ``_box``): always an ``action`` row, plus a
+            ``dead letter`` row only when ``self.on_failure`` is a
+            ``RelocateFailureAction``.
 
         Example:
             For ``on_failure: {action: move, dead_letter: output/dead-letters/}``,
@@ -746,9 +718,9 @@ class Plan:
             for ``action: ignore``, just ``[("action", "ignore")]``.
 
         Note:
-            A future action that also needs an extra row (say, ``copy``
-            wanting to show whether it overwrites) follows the same pattern:
-            add an ``isinstance`` branch here, not a change to ``_box``.
+            A future action that needs an extra row (``copy`` showing whether
+            it overwrites, say) follows the same pattern: add an
+            ``isinstance`` branch here and leave ``_box`` alone.
         """
         rows: list[tuple[str, str]] = [("action", self.on_failure.action)]
         if isinstance(self.on_failure, RelocateFailureAction):
@@ -758,17 +730,17 @@ class Plan:
     def _report_box(self) -> list[str]:
         """Builds the ``╭─ report ─...`` box: where the results are written.
 
-        Short by design: a report is always written, pass or fail (per the
-        project's failure-handling rules), so unlike ``on failure`` there is
-        no conditional content here, just where it lands and how many rows
-        it will have (one per expectation per object; the object count is
-        deliberately left out of the box itself, since it can be large and
-        already has its own summary line in ``_object_lines``).
+        A report is always written, pass or fail (per the project's
+        failure-handling rules), so unlike ``on failure`` this box has no
+        conditional content: only where the report goes and how many
+        expectations it covers (it holds one row per expectation per
+        object). The object count is left out of the box, because it can be
+        large and already has its own summary line in ``_object_lines``.
 
         Returns:
-            The finished, bordered box (see ``_box``), with a ``save on``
-            row (the sink's ``path`` if it has one, otherwise its
-            ``storage``) and an ``expectations`` row.
+            The bordered box (see ``_box``), with a ``save on`` row (the
+            sink's ``path`` if it has one, otherwise its ``storage``) and an
+            ``expectations`` row.
 
         Example:
             For a local file sink at ``output/reports/`` and a 9-rule
@@ -776,10 +748,10 @@ class Plan:
             ``[("save on", "output/reports/"), ("expectations", "9")]``.
 
         Note:
-            ``getattr(self.report, "path", None)`` exists because not every
-            ``SinkConfig`` has a ``path`` (a BigQuery sink, say, would not);
-            falling back to ``self.report.storage`` keeps this box working
-            for any sink type without an ``isinstance`` check per type.
+            ``getattr(self.report, "path", None)`` is there because not every
+            ``SinkConfig`` has a ``path`` (a BigQuery sink would not).
+            Falling back to ``self.report.storage`` keeps the box working for
+            any sink type without an ``isinstance`` check per type.
         """
         destination = getattr(self.report, "path", None) or self.report.storage
         rows = [
@@ -795,43 +767,41 @@ class Plan:
         full_path: bool = False,
         timezone: str = "UTC",
     ) -> str:
-        """Renders the plan for a terminal: the one public entry point of this file.
+        """Renders the plan for a terminal. This is the module's public entry point.
 
-        Everything else in ``Plan`` and the module-level helpers exist to
-        support this method; a caller (today a script, later a CLI's
-        ``--dry`` command) only ever needs ``Planner(engine).plan().render()``.
-        It assembles the five boxes and the object listing in a fixed order
-        (source, objects, validate, rules, on failure, report, summary), and
-        every argument controls verbosity only: none of them change what the
-        run would actually do, only how much of it this particular call
-        chooses to print.
+        Everything else in ``Plan`` and the module-level helpers supports
+        this method. A caller (a script today, a CLI ``--dry`` command later)
+        only needs ``Planner(engine).plan().render()``. It assembles the
+        boxes and the object listing in a fixed order (source, objects,
+        validate, rules, on failure, report, summary). Every argument
+        controls verbosity only. None of them changes what the run would do,
+        only how much of it this call prints.
 
         Args:
             full_objects: List every resolved object instead of the first
-                five (see ``_object_lines``). Meant for a CLI's future
+                five (see ``_object_lines``). For a future CLI
                 ``--full-objects`` flag.
             full_rules: List every rule, not just the per-severity counts
-                (see ``_rule_lines``). Meant for a CLI's future
-                ``--full-rules`` flag.
+                (see ``_rule_lines``). For a future CLI ``--full-rules``
+                flag.
             full_path: Show each object's path exactly as stored instead of
                 relative to the current directory (see ``_relative_to_cwd``).
-                Meant for a CLI's future ``--full-path`` flag.
+                For a future CLI ``--full-path`` flag.
             timezone: IANA zone name to render each object's modified time
-                in, e.g. ``"Asia/Bangkok"``. A viewer's preference, not part
-                of the plan itself, which is why it is a render argument
-                rather than a ``Plan`` field: the same ``Plan`` renders in
-                whatever zone whoever is reading it asks for, without
-                needing to be rebuilt.
+                in, e.g. ``"Asia/Bangkok"``. It is the reader's preference,
+                not part of the plan, so it is a render argument instead of a
+                ``Plan`` field: the same ``Plan`` renders in whatever zone
+                the reader asks for, without being rebuilt.
 
         Returns:
             The complete plan as one multi-line string, ready to ``print()``.
             Every line is padded or bordered to a consistent width (see
-            ``_BOX_WIDTH``), so it looks correct in a monospace terminal.
+            ``_BOX_WIDTH``), so it lines up in a monospace terminal.
 
         Raises:
-            ValueError: ``timezone`` is not a recognized IANA zone name (for
-                example, a typo like ``"Asia/Bangkog"``). Raised here, at the
-                start of the call, before any line is built, so a bad
+            ValueError: ``timezone`` is not a recognized IANA zone name (a
+                typo like ``"Asia/Bangkog"``, for example). The check runs at
+                the start of the call, before any line is built, so a bad
                 timezone never produces a half-rendered plan.
 
         Example:
@@ -844,11 +814,10 @@ class Plan:
               Plan: 1 object · 9 expectations
 
         Note:
-            To add a new section to the plan (say, a future ``runtime`` box
-            once checkpointing exists), write a ``Plan._runtime_box`` method
-            following the pattern of the others and call it here, at the
-            point in the sequence where it belongs; nothing about the
-            existing boxes needs to change to make room for it.
+            To add a section (a future ``runtime`` box once checkpointing
+            exists, say), write a ``Plan._runtime_box`` method like the
+            others and call it here at the right point in the sequence. The
+            existing boxes need no change.
         """
         try:
             tz = ZoneInfo(timezone)
@@ -876,16 +845,16 @@ class Plan:
 class Planner:
     """Turns a declaration into the concrete work a run would do.
 
-    The one place a glob is resolved, and the only part of a dry run that
-    touches the outside world. Listing is all it does: no file is opened, no
-    expectation is run, nothing is moved and nothing is written, so there is no
-    effectful path here to switch off when the run is a dry one.
+    It resolves the source glob, and it is the only part of a dry run that
+    touches the outside world. It only lists: no file is opened, no
+    expectation is run, nothing is moved and nothing is written, so a dry run
+    has no side effect here to switch off.
 
-    ``Planner`` (this class, does the I/O) and ``Plan`` (the dataclass above,
-    pure formatting) are deliberately two classes rather than one: it is what
-    lets ``Plan.render()`` be tested with fabricated data and no real
-    filesystem, and what lets the same resolved ``Plan`` be rendered several
-    times (different ``timezone``, ``full_rules``, ...) without re-globbing.
+    ``Planner`` (which does the I/O) and ``Plan`` (the dataclass above, pure
+    formatting) are separate classes. That lets ``Plan.render()`` be tested
+    with fabricated data and no real filesystem, and lets the same resolved
+    ``Plan`` be rendered several times (different ``timezone``,
+    ``full_rules``, ...) without globbing again.
 
     Example:
         >>> from cosmos.loader import from_yaml
@@ -899,17 +868,15 @@ class Planner:
         """Builds a ``Planner`` for one engine's declaration.
 
         Args:
-            engine: The already-loaded, already-validated pipeline
-                declaration (typically ``cosmos.loader.from_yaml(...)``'s
-                result). Nothing here re-reads or re-validates it; ``Planner``
-                assumes it is a finished ``Engine``, not a place to catch
-                config mistakes (that already happened at load time).
+            engine: The loaded, validated pipeline declaration (usually the
+                result of ``cosmos.loader.from_yaml(...)``). ``Planner`` does
+                not re-read or re-validate it; config mistakes were already
+                caught at load time.
 
         Note:
-            ``self.backend`` is pulled out once, here, purely as a
-            convenience so ``prepare_source_metadata`` reads as
-            ``self.backend.glob(...)`` instead of
-            ``self.engine.source.backend.glob(...)``; it is still the exact
+            ``self.backend`` is pulled out here only so
+            ``prepare_source_metadata`` can read ``self.backend.glob(...)``
+            instead of ``self.engine.source.backend.glob(...)``. It is the
             same object as ``engine.source.backend``, not a copy.
         """
         self.engine = engine
@@ -918,54 +885,51 @@ class Planner:
         self.backend: StorageBackend = self.source_config.backend
 
     def prepare_source_metadata(self) -> list[SourceObjectMetadata]:
-        """Resolves the source's glob pattern against reality, right now.
+        """Resolves the source's glob pattern against the filesystem, now.
 
-        This is the one line in the whole module that does I/O: everything
-        else in ``planner.py`` only formats data that was already fetched.
-        Calling this twice can return two different answers (a file could
-        appear or disappear between calls), which is exactly why ``Plan`` is
-        a frozen snapshot: ``Planner.plan()`` calls this once and the
-        resulting list is what every part of ``render()`` reports against,
-        so the numbers in one printed plan are always internally consistent
-        even if the filesystem keeps changing underneath it.
+        This is the only I/O in the module; everything else in
+        ``planner.py`` formats data that was already fetched. Two calls can
+        return different answers, because a file can appear or disappear in
+        between. That is why ``Plan`` is a snapshot: ``Planner.plan()`` calls
+        this once, and every part of ``render()`` reports against that one
+        list, so the numbers in a printed plan always agree with each other
+        even if the filesystem keeps changing.
 
         Returns:
             Every object the source's glob pattern matched, as
             ``SourceObjectMetadata`` (path, size, modified time), sorted by
-            path. Sorting makes the "first five" preview in
-            ``Plan._object_lines`` and the full listing deterministic
-            between runs, rather than however the backend happened to list
-            them.
+            path. Sorting makes the five-object preview in
+            ``Plan._object_lines`` and the full listing the same on every
+            run, whatever order the backend listed them in.
 
         Example:
             For ``source.file_path: "data/test_*.csv"`` matching three
-            files, this returns a three-item list, sorted
+            files, this returns three items sorted as
             ``test_1.csv, test_2.csv, test_3.csv``, each with its own
             ``size_bytes`` and ``modified_at`` timestamp from the filesystem.
 
         Note:
-            The actual listing logic (what "glob" means for local files vs.
-            a GCS bucket) lives in the storage backend
-            (``self.backend.glob``, e.g. ``storages/local.py``), not here;
-            this method only calls it and sorts the result, so it works
-            unchanged for every backend that implements ``StorageBackend``.
+            What "glob" means for local files or a GCS bucket is decided by
+            the storage backend (``self.backend.glob``, e.g.
+            ``storages/local.py``). This method only calls it and sorts the
+            result, so it works unchanged for every backend that implements
+            ``StorageBackend``.
         """
         return sorted(self.backend.glob(pattern=self.source_config.file_path), key=lambda x: x.path)
 
     def plan(self) -> Plan:
-        """Resolves the declaration into a ``Plan``: the module's main entry point.
+        """Resolves the declaration into a ``Plan``. This is the class's main entry point.
 
-        This is the method other code (a future CLI, a test, this file's own
-        examples) is expected to call; everything else on ``Planner`` and
-        ``Plan`` exists to support it. It does exactly two things: resolve
-        the source's glob against the real filesystem
-        (``prepare_source_metadata``), and copy every other field straight
-        off ``self.engine`` unchanged, since those are declared, not
-        discovered, and need no resolving at all.
+        Other code (a future CLI, a test, the examples in this module) calls
+        this method; everything else on ``Planner`` and ``Plan`` supports it.
+        It does two things: it resolves the source's glob against the
+        filesystem (``prepare_source_metadata``), and it copies every other
+        field from ``self.engine`` unchanged, since those are declared, not
+        discovered.
 
         Returns:
-            A ``Plan`` combining ``self.engine``'s declaration with
-            ``prepare_source_metadata()``'s result. Call ``.render()`` on it
+            A ``Plan`` combining ``self.engine``'s declaration with the
+            result of ``prepare_source_metadata()``. Call ``.render()`` on it
             to get the printable plan.
 
         Example:
@@ -976,11 +940,11 @@ class Planner:
             1
 
         Note:
-            To resolve something else at plan time (say, checking the report
-            sink's directory is writable), add it here as another field
-            passed to ``Plan(...)``, following the same pattern as
-            ``source_objects``: do the resolving in ``Planner.plan()``, keep
-            ``Plan`` itself a plain snapshot of the result.
+            To resolve something else at plan time (checking that the report
+            sink's directory is writable, say), do the work here and pass the
+            result to ``Plan(...)`` as another field, the way
+            ``source_objects`` is passed. ``Plan`` stays a plain snapshot of
+            the result.
         """
         return Plan(
             engine_id=self.engine.id,

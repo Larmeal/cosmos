@@ -9,12 +9,38 @@ logger = logging.getLogger(__name__)
 
 
 class LocalSink(BaseFileFormat):
+    """Writes the report as one JSON file on the local filesystem.
+
+    Example:
+        In the pipeline YAML::
+
+            report:
+              storage: local
+              format: file
+              path: output/reports/
+    """
+
     storage: Literal["local"]
 
     def _handle(self, result: CosmosResult) -> str:
+        """Serialize the whole result to JSON with ``model_dump_json()``.
+
+        Fields marked ``exclude`` (such as ``raw_gx_result``) are left out.
+        """
         return result.model_dump_json()
 
     def write_sink(self, result: CosmosResult) -> None:
+        """Write the result to ``path`` as JSON.
+
+        If ``path`` is an existing file, that file is overwritten. Otherwise
+        ``path`` is treated as a directory and the report goes to
+        ``<path>/<run_id>.json``, replacing any earlier report with the same
+        ``run_id``. Missing directories are created, and a relative ``path`` is
+        resolved against the current directory.
+
+        Args:
+            result: The run's result.
+        """
 
         if not isinstance(self.path, Path):
             directory = Path(self.path).resolve()

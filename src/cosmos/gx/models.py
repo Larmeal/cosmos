@@ -58,10 +58,27 @@ class ExpectationConfig(BaseModel):
     @computed_field
     @property
     def expectation_key(self) -> str:
+        """Stable identity of this rule: a SHA-256 of its type and kwargs.
+
+        Two rules with the same ``expectation_type`` and ``kwargs`` get the same
+        key. The kwargs are hashed as written, so the same kwargs in a different
+        order give a different key. The key is copied into ``meta`` (see
+        ``_reserved_meta_keys``) because ``meta`` is the only field GX echoes back
+        in its result, and that is how ``GXTranslateExpectationResult`` matches
+        each result to its rule.
+        """
         return hashlib.sha256(f"{self.expectation_type}-{self.kwargs}".encode()).hexdigest()
 
     @model_validator(mode="after")
     def _reserved_meta_keys(self) -> Self:
+        """Reject ``meta`` that uses a reserved key, then add ``expectation_key`` to it.
+
+        ``expectation_key`` belongs to COSMOS. A user value under that name would
+        be silently overwritten here, so it is refused at load time instead.
+
+        Raises:
+            ValueError: ``meta`` contains a key from ``_RESERVED_META_KEYS``.
+        """
         # Ensure that reserved meta keys are not used in the meta dictionary
         # For set type, Use '&' to find the intersection with the keys of the meta dictionary
         if collision := _RESERVED_META_KEYS & self.meta.keys():
@@ -102,6 +119,12 @@ class ContractConfig(BaseModel):
 
     @model_validator(mode="after")
     def _resolve_gx_names(self) -> Self:
+        """Fill in any GX name the YAML left out, derived from the contract's ``name``.
+
+        GX needs a datasource, batch definition and suite name. Unset ones become
+        ``<name>_source``, ``<name>_batch`` and ``<name>_suite``. Names set in the
+        YAML are kept.
+        """
         self.datasource_name = self.datasource_name or f"{self.data_asset_name}_source"
         self.batch_definition_name = self.batch_definition_name or f"{self.data_asset_name}_batch"
         self.expectation_suite_name = self.expectation_suite_name or f"{self.data_asset_name}_suite"
@@ -127,6 +150,15 @@ class DataDocsConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_store_path_if_enabled(self) -> Self:
+        """Require ``store_path`` when Data Docs is enabled, and make it absolute.
+
+        A relative ``store_path`` is resolved against the current directory at
+        load time, so it keeps pointing at the same place if the working
+        directory changes later.
+
+        Raises:
+            ValueError: ``enabled`` is true and ``store_path`` is missing or empty.
+        """
         if self.enabled and not self.store_path:
             raise ValueError("store_path must be specified if Data Docs are enabled")
         if self.store_path is not None:
@@ -135,7 +167,7 @@ class DataDocsConfig(BaseModel):
 
 
 class GXConfig(BaseModel):
-    """The `validate:` section of the configuration.
+    """The `validation:` section of the configuration.
 
     Attributes:
         contract: The rules to apply, and what each failure means.

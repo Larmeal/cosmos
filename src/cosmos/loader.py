@@ -15,7 +15,10 @@ def from_yaml(file_path: str | Path) -> Engine:
     """Load an engine configuration from a YAML file.
 
     Args:
-        file_path (str | Path): The path or string representation of the YAML file to load.
+        file_path (str | Path): Path to the YAML file to load.
+
+    Returns:
+        The validated engine. Its class is chosen by the file's ``engine:`` field.
     """
     config = YamlLoader(file_path=file_path).load_yaml()
     engine = _ADAPTER.validate_python(config)

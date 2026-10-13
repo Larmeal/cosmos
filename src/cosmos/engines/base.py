@@ -16,10 +16,11 @@ if TYPE_CHECKING:
 
 
 class BaseEngine(BaseModel, ABC):
-    """Base class for all engine implementations.
+    """Base class for every engine.
 
-    This class serves as a foundation for specific engine implementations,
-    providing common attributes and methods that can be shared across different engines.
+    Holds the fields all engines share (``source``, ``validation``, ``report``,
+    ``on_failure``) and declares the methods each engine implements to load and
+    inspect its data.
 
     Attributes:
         engine: The type of engine (e.g., 'pandas', 'spark', 'sql').
@@ -48,6 +49,14 @@ class BaseEngine(BaseModel, ABC):
 
     @model_validator(mode="after")
     def _inherit_storage_for_action(self) -> Self:
+        """Give a delete, move or copy action the source's storage backend when it has none.
+
+        These actions need a backend to perform the file operation, but the YAML
+        normally leaves ``on_failure.backend`` unset. This fills it with
+        ``source.backend``, so the action works on the same storage the file was
+        read from. A backend already set on the action is kept, and ``ignore``
+        needs no backend, so it is left alone.
+        """
         if (
             isinstance(self.on_failure, DeleteFailureAction) or isinstance(self.on_failure, RelocateFailureAction)
         ) and self.on_failure.backend is None:
@@ -61,14 +70,14 @@ class BaseEngine(BaseModel, ABC):
     def _validate_on_empty(self, row_count: int | None = None, column_count: int | None = None) -> None:
         """Raise ``SourceEmptyError`` when ``self.dataframe`` has no rows to validate.
 
-        Always raises on empty data; it does not decide what that means. Whether an
-        empty object is skipped or treated as a failure is a run-level policy
-        decision (``source.on_empty``), made once by the runner for every empty
-        object the same way, whether the emptiness was detected here (a header with
-        no rows) or further back, while reading (zero bytes, no header at all).
-        ``row_count``/``column_count`` are passed through to the exception so the
-        report can still state the shape even though it interrupts ``load_data``
-        before it returns.
+        Always raises on empty data, without deciding what that means. Whether an
+        empty object is skipped or treated as a failure is a run-level setting
+        (``source.on_empty``) that the runner applies the same way to every empty
+        object, whether the emptiness was detected here (a header with no rows) or
+        earlier, while reading (zero bytes, no header at all).
+        ``row_count``/``column_count`` are passed to the exception so the report can
+        still state the shape, even though raising stops ``load_data`` before it
+        returns.
         """
         if self.is_empty():
             raise SourceEmptyError(f"{self.source.file_path} is empty", row_count=row_count, column_count=column_count)
@@ -79,10 +88,9 @@ class BaseEngine(BaseModel, ABC):
 
     @abstractmethod
     def load_data(self, file_path: str) -> Self:
-        """Load data from the specified source into ``self.dataframe``.
+        """Load the source object at ``file_path`` into ``self.dataframe``.
 
-        This method should be implemented by subclasses to handle the specific
-        logic for loading data based on the engine type.
+        Each engine implements its own reading.
 
         Returns:
             ``self``, so the caller can chain ``is_empty()`` / ``statistics()``

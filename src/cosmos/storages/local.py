@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 class LocalStorage(BaseStorage):
     """Files on the machine COSMOS runs on. The OS performs every operation.
 
-    Knows nothing about failure actions: it is handed a source and a destination
-    and moves bytes. Which file to move, where to, and what the outcome means are
-    decided in ``actions.py``.
+    It knows nothing about failure actions. It is given a source and a
+    destination and moves the bytes; which file to move, where to, and what the
+    outcome means are decided in ``actions.py``.
     """
 
     storage: Literal["local"] = Field(description="The storage backend type, such as 'local'")
@@ -32,7 +32,7 @@ class LocalStorage(BaseStorage):
         """Create the destination directory and work out the target path.
 
         The moved file keeps its own name, so two source objects sharing a basename
-        resolve to the same target. See ``move`` for what that costs.
+        resolve to the same target. See ``move_obj`` for what that costs.
 
         Args:
             src: Path of the file about to be relocated.
@@ -55,12 +55,15 @@ class LocalStorage(BaseStorage):
         """Expand a local glob, keeping only files.
 
         Relative and absolute patterns are both accepted, as is a recursive
-        ``**``. A directory that matches contributes nothing rather than a source
-        object that cannot be read.
+        ``**``. A matching directory is skipped, so it never becomes a source
+        object that cannot be read. Every path is resolved to an absolute one.
 
         Args:
             pattern: A local glob, e.g. ``data/test_*.csv``. A path with no
                 wildcard matches only itself.
+
+        Raises:
+            FileNotFoundError: No file matches ``pattern``.
         """
 
         all_objects = _fs_glob(pattern, recursive=True)
@@ -74,8 +77,8 @@ class LocalStorage(BaseStorage):
     def _to_metadata(self, entry: Path) -> SourceObjectMetadata:
         """Read size, creation time and mtime from a single ``os.stat`` call.
 
-        The path is kept exactly as the glob produced it (not resolved), so it
-        matches the ``source_object`` key the report is written under.
+        The path is stored as an absolute, resolved path, which is the
+        ``source_object`` key the report is written under.
 
         ``created_at`` is exact where the OS records a creation time:
         ``st_birthtime`` (macOS, BSD, and Windows on Python 3.12+), or ``st_ctime``
@@ -136,7 +139,7 @@ class LocalStorage(BaseStorage):
         modification time the pipeline may have selected the file by.
 
         Note:
-            Overwrites an existing file of the same name, exactly as ``move``
+            Overwrites an existing file of the same name, as ``move_obj``
             does.
 
         Args:
@@ -157,10 +160,10 @@ class LocalStorage(BaseStorage):
     def delete_obj(self, src: str) -> None:
         """Delete a file, treating one that is already gone as success.
 
-        A re-run after a crash mid-action can find the file deleted by the
-        previous attempt. Raising there would abort a run over something already
-        in the state it was asked to reach, so absence is logged and accepted:
-        the report is what records whether the first attempt got this far.
+        A re-run after a crash mid-action can find the file already deleted by
+        the previous attempt. Raising there would abort a run over a file that is
+        already in the requested state, so a missing file is logged and accepted.
+        The report records whether the first attempt got this far.
 
         Args:
             src: Path of the file to delete.

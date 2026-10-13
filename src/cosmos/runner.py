@@ -35,7 +35,32 @@ logger = logging.getLogger(__name__)
 
 
 class Runner:
+    """Runs one pipeline end to end: list, read, validate, decide, act, report.
+
+    For each source object the glob matches, the runner reads it with the engine,
+    validates it with GX, asks ``SourceObjectPolicy`` for a decision and an action,
+    performs the action, and records a ``SourceObjectResult``. When every object is
+    done, it rolls the results up into one ``CosmosResult`` and writes it to the
+    report sink.
+
+    One bad object does not stop the run. An empty source is handled according to
+    ``source.on_empty``, any other exception marks that object ``aborted``, and the
+    loop moves on to the next object. ``on_failure.mode`` decides whether an
+    aborted object is acted on.
+
+    Example:
+        >>> from cosmos.loader import from_yaml
+        >>> Runner(from_yaml("data/template_test.yml")).run()
+    """
+
     def __init__(self, engine: Engine) -> None:
+        """Prepare a runner for one loaded pipeline.
+
+        Args:
+            engine: The validated pipeline declaration, usually from
+                ``cosmos.loader.from_yaml``. Each source object is read into a
+                copy of it, so this instance itself never holds data.
+        """
         self.engine = engine
         self._storage = self.storage
         self._source = self.source
@@ -45,25 +70,31 @@ class Runner:
 
     @property
     def on_failure(self) -> OnFailureActionConfig:
+        """The ``on_failure`` block: what to do with a file that fails."""
         return self.engine.on_failure
 
     @property
     def sink(self) -> SinkConfig:
+        """The ``report`` block: where the run's result is written."""
         return self.engine.report
 
     @property
     def validation(self) -> GXConfig:
+        """The ``validation`` block: the contract and the Data Docs settings."""
         return self.engine.validation
 
     @property
     def source(self) -> SourceConfig:
+        """The ``source`` block: which files to read, and how."""
         return self.engine.source
 
     @property
     def storage(self) -> StorageBackend:
+        """The storage backend that lists the source files and relocates failed ones."""
         return self.engine.source.backend
 
     def __repr__(self) -> str:
+        """A short summary for logs and the REPL: id, engine, source pattern and contract name."""
         return (
             f"Runner(id={self.engine.id!r}, "
             f"engine={self.engine.engine!r}, "
@@ -73,19 +104,30 @@ class Runner:
 
     @contextmanager
     def _timer(self) -> Generator[Callable[[], float]]:
+        """Measure how long a ``with`` block takes.
+
+        Yields:
+            A function that returns the seconds elapsed since the block started.
+            The clock keeps running after the block, so call it right after the
+            block ends.
+
+        Example:
+            >>> with self._timer() as elapsed:
+            ...     do_work()
+            >>> seconds = elapsed()
+        """
         start = perf_counter()
         yield lambda: perf_counter() - start
 
     def _apply_action(self, action_result: ActionResult, src: str) -> Exception | None:
         """Performs the planned action and records whether it actually worked.
 
-        Runs once the decision is already final, so a failure here never touches the
-        decision, expectations or statistics already computed for this source object;
-        it is returned instead, so the caller can still record the object as aborted
-        without losing the verdict already reached. It also never raises on its own:
-        any exception from the storage backend is caught and recorded on
-        ``action_result``, so one file's action failing cannot abort the objects still
-        left in the loop.
+        Runs after the decision is final, so a failure here never changes the
+        decision, expectations or statistics already computed for this source object.
+        The exception is returned instead, so the caller can record the object as
+        aborted and still keep the verdict. Nothing is raised from here: any exception
+        from the storage backend is caught and recorded on ``action_result``, so one
+        file's failed action cannot abort the objects still left in the loop.
         """
         if action_result.action == ActionName.IGNORE:
             return None
@@ -101,6 +143,42 @@ class Runner:
             return e
 
     def run(self) -> None:
+        """Process every source object, then write one report for the whole run.
+
+        For each object the glob matches:
+
+        1. Read it into a copy of the engine and collect its statistics.
+        2. Validate it with GX and translate the result into ``ExpectationResult`` rows.
+        3. Ask ``SourceObjectPolicy`` for the decision and the action.
+        4. Perform the action (see ``_apply_action``).
+        5. Record a ``SourceObjectResult``.
+
+        How each kind of failure is recorded:
+
+        - Empty source (``SourceEmptyError``): with ``on_empty: skip`` the file is
+          left alone and the object is ``completed`` with no decision. With
+          ``on_empty: fail`` the failure action is performed and the object is
+          ``aborted``.
+        - Any other exception while reading or validating: the object is
+          ``aborted``, and the failure action runs only when ``on_failure.mode``
+          is ``any_failure``.
+        - The action itself fails: the object is ``aborted``, but its decision and
+          expectation results are kept.
+
+        After the loop, ``CosmosPolicy`` gives the run-level decision, and
+        ``run_status`` is ``completed`` if every object completed, ``aborted`` if
+        every object aborted, and ``partial`` otherwise. The ``CosmosResult`` is
+        then written to the report sink; nothing is returned.
+
+        ``run_id`` is ``<contract name>-<id>``, so every run of the same pipeline
+        gets the same ``run_id``, and the local sink overwrites the previous
+        report file.
+
+        Raises:
+            FileNotFoundError: With local storage, the pattern matched no file.
+                The glob raises this before any object is processed, so no report
+                is written.
+        """
         source_object_metadata: list[SourceObjectMetadata] = self.storage.glob(self.engine.source.file_path)
         logger.info("resolved %d source object(s) for %s", len(source_object_metadata), self.engine.source.file_path)
 

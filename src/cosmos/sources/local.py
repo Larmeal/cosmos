@@ -27,10 +27,17 @@ class LocalSourceConfig(FileBaseConfig):
     @field_validator("file_path")
     @classmethod
     def validate_file_path(cls, value: str) -> str:
-        """Validate the local file path to ensure it exists and is a file.
+        """Reject a path that contains a URI scheme (``://``), such as ``gs://...``.
+
+        Whether the path matches any files is not checked here; that happens
+        when the glob is resolved.
 
         Args:
-            value (str): The local file path to validate."""
+            value (str): The local file path to validate.
+
+        Raises:
+            ValueError: The path contains ``://``.
+        """
 
         if "://" in value:
             raise ValueError(f"The provided file path '{value}' is not a valid local path.")

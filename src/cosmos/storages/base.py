@@ -13,8 +13,9 @@ class BaseStorage(BaseModel, ABC):
 
     One subclass per backend (local disk, GCS, S3), each implemented with that
     backend's own SDK. ``glob`` resolves a source pattern into the files a run
-    will process, each with the size and mtime the planner renders; ``move``,
-    ``copy`` and ``delete`` relocate or remove a file after validation fails.
+    will process, each with the size and mtime the planner renders.
+    ``move_obj``, ``copy_obj`` and ``delete_obj`` relocate or remove a file after
+    validation fails.
 
     Reading is not part of this interface: engines read by URI with their own
     readers.
@@ -26,10 +27,10 @@ class BaseStorage(BaseModel, ABC):
     def glob(self, pattern: str) -> list[SourceObjectMetadata]:
         """Resolve a pattern into the objects it matches, metadata included.
 
-        Template method: the shape of the result is fixed here so every backend
-        agrees on it: sorted by ``path`` for a reproducible processing order,
-        directories never present. Backends supply the two halves: ``_list_files``
-        walks the backend, ``_to_metadata`` turns one native entry into a
+        A template method. The shape of the result is fixed here so every backend
+        agrees on it: sorted by ``path`` for a reproducible processing order, with
+        no directories. Backends supply the two halves: ``_list_files`` walks the
+        backend, and ``_to_metadata`` turns one native entry into a
         ``SourceObjectMetadata``.
 
         Args:
@@ -59,10 +60,10 @@ class BaseStorage(BaseModel, ABC):
         """Map one entry from ``_list_files`` to a ``SourceObjectMetadata``.
 
         Must populate ``path``, ``size_bytes``, ``created_at`` and ``modified_at``.
-        A backend that cannot report a creation time falls back to the
-        modification time rather than leaving ``created_at`` empty. The entry already
-        carries what is needed (a GCS ``Blob`` from a listing has ``size``,
-        ``time_created`` and ``updated`` on it), so this never issues another request.
+        A backend that cannot report a creation time uses the modification time
+        instead of leaving ``created_at`` empty. The entry already carries what is
+        needed (a GCS ``Blob`` from a listing has ``size``, ``time_created`` and
+        ``updated`` on it), so this never makes another request.
         """
 
     @abstractmethod

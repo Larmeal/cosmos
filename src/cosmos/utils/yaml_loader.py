@@ -5,16 +5,14 @@ from yaml import safe_load
 
 
 class YamlLoader(BaseModel):
-    """
-    A loader class for YAML files.
-    """
+    """Loads one YAML config file, after checking that it exists and has a YAML extension."""
 
     file_path: Path | str
 
     @field_validator("file_path")
     @classmethod
     def validate_file_path(cls, value: Path | str) -> Path:
-        """Validate the file path to ensure it exists and is a file.
+        """Check that the path exists and is a file.
 
         Args:
             value (Path | str): The file path to validate.
@@ -33,7 +31,7 @@ class YamlLoader(BaseModel):
     @field_validator("file_path")
     @classmethod
     def validate_file_extension(cls, value: Path) -> Path:
-        """Validate the file extension to ensure it is a YAML file.
+        """Check that the file has a ``.yaml`` or ``.yml`` extension.
 
         Args:
             value (Path): The file path to validate.
@@ -49,10 +47,10 @@ class YamlLoader(BaseModel):
         return value
 
     def load_yaml(self) -> dict:
-        """Reads the YAML file and parses it into a dictionary.
+        """Read the YAML file and parse it into a dict.
 
         Returns:
-            A dictionary containing the parsed YAML configuration.
+            The parsed configuration.
         """
         with open(self.file_path, encoding="utf-8") as file:
             return safe_load(file)

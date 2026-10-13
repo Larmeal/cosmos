@@ -8,24 +8,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseConfig(BaseModel, ABC):
-    """Base configuration class for all components.
+    """Base for every source configuration.
 
-    This class serves as a foundation for other configuration classes,
-    providing common attributes and validation logic.
-
-    Attributes:
-        name: The name of the component.
-        description: A brief description of the component's purpose.
+    Forbids unknown fields, so a typo in the ``source`` block fails at load
+    instead of being silently dropped.
     """
 
     model_config = ConfigDict(extra="forbid")
 
 
 class FileBaseConfig(BaseConfig):
-    """Base configuration class for all data sources.
-
-    This class holds common attributes shared across different storage backends
-    to enforce the DRY (Don't Repeat Yourself) principle.
+    """Fields every file-based source shares, whatever storage backend it uses.
 
     Attributes:
         file_format: The format of the file (e.g., 'csv', 'parquet', 'json').

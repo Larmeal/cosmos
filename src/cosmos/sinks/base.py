@@ -7,21 +7,32 @@ from cosmos.results import CosmosResult
 
 
 class BaseSink(ABC, BaseModel):
+    """Base for every report sink: a place a run's ``CosmosResult`` is written.
+
+    The ``report.storage`` field picks the concrete class (see ``SinkConfig``).
+    Subclasses implement ``_handle``, which turns the result into the sink's
+    payload, and ``write_sink``, which writes that payload.
+    """
+
     @abstractmethod
     def _handle(self) -> None:
-        """Abstract method to be implemented by all sinks for handling data."""
+        """Turn the result into the payload this sink writes."""
         pass
 
     @abstractmethod
     def write_sink(self, result: CosmosResult) -> None:
-        """Abstract method to be implemented by all sinks for handling data."""
+        """Write the run's result to this sink."""
         pass
 
 
 class BaseFileFormat(BaseSink):
+    """Base for sinks that write the report as a file at ``path``. ``format`` must be ``"file"``."""
+
     format: Literal["file"]
     path: str = Field(description="Path to store the report file.")
 
 
 class BaseTableFormat(BaseSink):
+    """Base for sinks that write the report as rows in a table. ``format`` must be ``"table"``."""
+
     format: Literal["table"]

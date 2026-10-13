@@ -27,9 +27,19 @@ logger = logging.getLogger(__name__)
 
 
 class GXValidator:
-    """Base class for GX validators. Defines the interface for validation."""
+    """Builds a GX suite from the contract and validates one dataframe against it."""
 
     def __init__(self, config: GXConfig) -> None:
+        """Prepare a validator for one contract.
+
+        Copies the GX names from the contract and builds the expectation suite
+        once. No GX context is created here; ``validate()`` creates a new one on
+        each call and rebuilds the suite through ``expectation_suites``.
+
+        Args:
+            config: The ``validation:`` section, holding the contract and the
+                Data Docs settings.
+        """
         self.context: EphemeralDataContext | FileDataContext
         self.config: GXConfig = config
         self._datasource_name = self.config.contract.datasource_name
@@ -40,7 +50,7 @@ class GXValidator:
 
     @property
     def expectation_suites(self) -> ExpectationSuite:
-        """Constructs an ExpectationSuite from the GXConfig."""
+        """Build an ExpectationSuite from the contract's expectations."""
         suite = ExpectationSuite(name=self._expectation_suite_name)
         for exp_cfg in self.config.contract.expectations:
             suite.add_expectation_configuration(
@@ -58,7 +68,7 @@ class GXValidator:
 
     @staticmethod
     def _map_severity(severity_str: str) -> FailureSeverity:
-        """Converts the string severity from YAML to GX FailureSeverity Enum."""
+        """Map a YAML severity string to GX's ``FailureSeverity``, defaulting to ``CRITICAL``."""
 
         match severity_str.lower():
             case "critical":
@@ -71,7 +81,7 @@ class GXValidator:
                 return FailureSeverity.CRITICAL
 
     def _get_context(self, mode: Literal["ephemeral", "file"]) -> EphemeralDataContext | FileDataContext:
-        """Initializes and returns a GX context."""
+        """Create a GX context: in memory, or file-backed under ``data_docs.store_path/gx``."""
         from great_expectations import get_context
 
         if mode == "file":
@@ -79,7 +89,7 @@ class GXValidator:
         return get_context(mode=mode)
 
     def _build_document(self, context: FileDataContext, resource_identifiers: list[ValidationResultIdentifier]) -> None:
-        """Builds the GX data documentation."""
+        """Register the Data Docs site and render pages for the given results only."""
 
         site_name = f"{self._data_asset_name}_site"
 
@@ -110,7 +120,10 @@ class GXValidator:
         context.build_data_docs(resource_identifiers=resource_identifiers)
 
     def validate(self, df: Any) -> ExpectationSuiteValidationResult:
-        """Validates the DataFrame and returns the result dictionary."""
+        """Validate ``df`` against the suite and return GX's validation result.
+
+        Builds Data Docs as well when ``data_docs.enabled`` is set.
+        """
         dataset = self.config.contract.data_asset_name
         logger.info(f"Starting GX validation for dataset: {dataset}")
 

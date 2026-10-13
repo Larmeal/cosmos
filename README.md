@@ -25,25 +25,24 @@
 
 ## What it is
 
-**A data validation and profiling framework for data pipelines.**
-
-COSMOS operationalizes [Great Expectations](https://greatexpectations.io/): it manages configuration,
+COSMOS is a data validation and profiling framework for data pipelines. It handles the operational
+work around [Great Expectations](https://greatexpectations.io/): it manages configuration,
 dispatches across engines, decides what happens when validation fails, and reports results to
 pluggable sinks.
 
-It is a **layer inside** someone else's pipeline (Airflow / Dagster / a script), not a pipeline, not
-a scheduler, not an ETL tool. It is built for **automated systems that run daily and report on data
-processing**, rather than for people exploring data interactively.
+COSMOS runs as a layer inside someone else's pipeline (Airflow, Dagster, or a plain script). It is
+not a pipeline, a scheduler, or an ETL tool. It is built for automated systems that run daily and
+report on data processing, and is not meant for interactive data exploration.
 
 ## What it adds over Great Expectations
 
 | | |
 |---|---|
-| **Failure lifecycle** | GX reports that a batch failed; it will not move the offending file to a dead-letter location or record what happened. COSMOS does both. |
-| **Multi-engine dispatch** | One declarative YAML shape running on pandas, Spark or SQL. |
-| **Profiling** | GX 1.x substantially pared back the profiling story that existed in 0.x. |
-| **Retry safety** | Every report row carries `run_id`/`attempt_id` from the first release, so a retried run never writes a duplicate row, whatever the sink. |
-| **Version isolation** | GX is a permanent, load-bearing dependency, not a swap-out abstraction. It stays confined to one module (`gx/`), so a GX version bump is fixed in one place instead of leaking through the codebase. |
+| Failure lifecycle | GX reports that a batch failed, but it will not move the offending file to a dead-letter location or record what happened. COSMOS does both. |
+| Multi-engine dispatch | The same declarative YAML runs on pandas, Spark or SQL. |
+| Profiling | GX 1.x removed much of the profiling support that 0.x had. COSMOS brings it back (planned for v0.6). |
+| Retry safety | Every report row carries `run_id`/`attempt_id` from the first release, so a retried run never writes a duplicate row, in any sink. |
+| Version isolation | COSMOS depends on GX permanently and does not hide it behind an interface. All GX calls live in one package (`gx/`), so a GX version bump is fixed in one place. |
 
 ## How it works
 
@@ -57,29 +56,29 @@ Source ──[ Engine ]────►┤                  ├────► Si
                           Policy ──► Action on the Source
 ```
 
-Both verbs share one pipe: same source reading, same engine, same sink. Profiling never fails, so
-only validation can trigger an action on the source file.
+Profiling and validation read the source the same way, run on the same engine, and write to the
+same sink. Profiling never fails, so only validation can trigger an action on the source file.
 
 ## Features
 
-- **One YAML file per pipeline**, parsed and validated by Pydantic. A typo fails at load, not ten
-  minutes into a run.
-- **Per-expectation severity**: `critical` / `warning` / `info`. Severity is what decides whether
-  the pipeline acts, rather than a bare pass/fail.
-- **Failure actions on the source file**: `ignore`, `move`, `copy`, `delete`, performed by the
-  storage system that owns the data (GCS moves its own objects; the OS moves local files).
-- **A report is always written**, independently of the file action, so "write to BigQuery *and* move
-  the file" is expressible. The report is written *before* the file is touched.
-- **One file = one batch**, so a result can always name the file it came from.
-- **A two-class error taxonomy that decides retryability**: `ConfigError` aborts the run, and
-  `DataError` dead-letters one origin. Anything else is fatal by construction: it propagates with
-  nothing touched, so a network blip cannot quarantine healthy files.
-- **Partial failure continues**: a bad file is skipped and recorded; the remaining files still run.
-- **Library first, CLI second.** The library returns the reasoning; the CLI wraps it.
-- **Custom expectations**: subclass GX's own `Expectation`, register it, and it is just another
-  `expectation_type` string in the contract, no different from a built-in one.
-- **Config-driven editor autocomplete**: the JSON Schema handed to your editor is generated from the
-  same Pydantic models COSMOS validates with, so it can never drift from what the code actually accepts.
+- One YAML file per pipeline, parsed and validated by Pydantic. A typo fails when the file loads,
+  not ten minutes into a run.
+- Each expectation has a severity: `critical`, `warning` or `info`. The severity decides whether
+  the pipeline acts on a failure.
+- On failure, COSMOS can `ignore`, `move`, `copy` or `delete` the source file. The storage system
+  that owns the data does the work: GCS moves its own objects, and the OS moves local files.
+- A report is always written, separately from the file action, so one pipeline can write to
+  BigQuery *and* move the file. The report is written *before* the file is touched.
+- One file is one batch, so every result names the file it came from.
+- Two error classes decide what is retryable. `ConfigError` aborts the run, and `DataError`
+  dead-letters one source file. Any other exception is fatal: it stops the run before any file is
+  touched, so a network blip cannot quarantine healthy files.
+- A bad file is skipped and recorded, and the remaining files still run.
+- The library returns the reasoning behind every result. The CLI is a thin wrapper around it.
+- Custom expectations: subclass GX's own `Expectation`, register it, and use its name as an
+  `expectation_type` in the contract, the same way as a built-in one.
+- Editor autocomplete comes from a JSON Schema generated from the same Pydantic models COSMOS
+  validates with, so the schema always matches what the code accepts.
 
 ```yaml
 id: customer_daily
@@ -106,27 +105,30 @@ on_failure:
 
 ## Not in scope
 
-Scheduling · writing validated data out (ETL) · data catalog / lineage · alerting (the orchestrator's
-`on_failure_callback` does it better) · exploratory data analysis · a drift platform (the
-time-series table plus SQL views is the answer) · an in-house expectation vocabulary, since GX
-expectation names pass through unchanged.
+- Scheduling
+- Writing validated data out (ETL)
+- Data catalog or lineage
+- Alerting, which the orchestrator's `on_failure_callback` handles better
+- Exploratory data analysis
+- A drift platform. COSMOS ships a time-series table, and drift is computed with SQL views over it.
+- An in-house expectation vocabulary. GX expectation names pass through unchanged.
 
 ## Roadmap
 
 | | Ships |
 |---|---|
-| **v0.1** | pandas · local · CSV, end to end · `action: ignore\|move\|copy\|delete` · custom expectations · JSON sink · GX Data Docs · library API · error taxonomy · retry-safe reports |
-| **v0.2** | GCS · BigQuery sink · `merge` · checkpoint / resume |
-| **v0.3** | Jinja · contract reuse · CLI |
-| **v0.4** | Spark |
-| **v0.5** | SQL |
-| **v0.6** | profiling + drift SQL views |
+| v0.1 | pandas · local · CSV, end to end · `action: ignore\|move\|copy\|delete` · custom expectations · JSON sink · GX Data Docs · library API · error taxonomy · retry-safe reports |
+| v0.2 | GCS · BigQuery sink · `merge` · checkpoint / resume |
+| v0.3 | Jinja · contract reuse · CLI |
+| v0.4 | Spark |
+| v0.5 | SQL |
+| v0.6 | profiling + drift SQL views |
 
 ## Status
 
-**Pre-v0.1 and under active construction.** The configuration layer, the GX adapter, local storage,
-the planner and the policy work; report sinks don't write yet and the runner doesn't finish the loop
-(no action is executed, no result is returned).
+COSMOS is pre-v0.1 and under active construction. The configuration layer, the GX adapter, local
+storage, the planner and the policy work. Report sinks don't write yet, and the runner doesn't
+finish the loop: it executes no action and returns no result.
 
 ## Development
 

@@ -44,8 +44,8 @@ class ActionStatus(StrEnum):
     """Where one ``ActionResult`` is in its own lifecycle, separate from which action it names.
 
     ``policy.py`` only ever produces ``PENDING`` or ``SKIPPED``. The runner
-    is what moves a ``PENDING`` row to ``COMPLETED`` or ``FAILED`` once it
-    has actually tried to perform the action.
+    moves a ``PENDING`` row to ``COMPLETED`` or ``FAILED`` once it has tried
+    to perform the action.
 
     A row still at ``PENDING`` in a written report means the process died
     between planning the action and carrying it out.
@@ -87,9 +87,9 @@ class Decision(StrEnum):
     other two leave the file untouched but are still written to the report.
 
     At the run level, ``CosmosResult.decision`` rolls these up across every
-    object. This is the "is the data okay" verdict, read by whoever owns the
-    data, as opposed to ``RunStatus``, which answers "did COSMOS do its job"
-    and is read by whoever runs the pipeline.
+    object. It answers "is the data okay" for whoever owns the data.
+    ``RunStatus`` answers a different question, "did COSMOS do its job", for
+    whoever runs the pipeline.
 
     Example:
         >>> Decision.FAILED
@@ -117,14 +117,12 @@ class RunStatus(StrEnum):
         PARTIAL: A mix of completed and aborted objects.
         ABORTED: Every object aborted.
 
-    ``ABORTED`` is deliberately louder than ``PARTIAL``: every object
-    failing to even run points at something systemic (bad credentials, a
-    network outage), not at ordinary bad data, and should draw attention
-    first.
+    ``ABORTED`` should draw attention before ``PARTIAL``. When no object
+    could even be processed, the cause is usually systemic (bad credentials,
+    a network outage), not ordinary bad data.
 
-    ``PARTIAL`` is the everyday case of "partial failure continues": most
-    files were fine, a few individually could not be read, and the rest
-    still ran.
+    ``PARTIAL`` is the everyday case of "partial failure continues": a few
+    files could not be read, and the rest still ran.
 
     Read by whoever runs the pipeline; ``Decision`` is read by whoever owns
     the data.
@@ -173,14 +171,12 @@ class Severity(StrEnum):
     """COSMOS's own mirror of GX's ``FailureSeverity``: same three levels, no GX import.
 
     Building a GX expectation suite requires a ``FailureSeverity`` value
-    (from ``great_expectations.expectations.metadata_types``), but
-    ``results.py`` is a leaf module that must import nothing of ours and
-    nothing of GX's, so every other module can depend on it without dragging
-    ``great_expectations`` in transitively.
+    (from ``great_expectations.expectations.metadata_types``). ``results.py``
+    is a leaf module that imports nothing from COSMOS or GX, so every other
+    module can depend on it without pulling in ``great_expectations``.
 
-    Declaring an equivalent enum here instead keeps that boundary intact;
-    ``gx/validator.py``'s ``_map_severity`` is the only place that translates
-    between the two.
+    An equivalent enum here keeps that boundary. ``gx/validator.py``'s
+    ``_map_severity`` is the only place that translates between the two.
 
     Values:
         CRITICAL: A failure triggers the configured ``on_failure`` action.
@@ -203,12 +199,12 @@ class Severity(StrEnum):
 class SourceObjectMetadata(BaseModel):
     """Resolved reality for one source object: where it is, how big, how old.
 
-    Produced by ``storage.glob``: every backend fills the same three required
-    fields from its own listing, so a missing one fails at construction rather
-    than surfacing as a hole in the report. ``created_at`` is always present but
-    is only exact where the backend reports a creation time; elsewhere it is an
-    approximation (see the field). ``metadata`` is a backend-specific bag that
-    nothing downstream interprets.
+    Produced by ``storage.glob``. Every backend fills the same four required
+    fields from its own listing, so a missing one fails at construction instead
+    of showing up as a hole in the report. ``created_at`` is always present, but
+    it is exact only where the backend reports a creation time; elsewhere it is
+    an approximation (see the field). ``metadata`` is a backend-specific bag
+    that nothing downstream interprets.
     """
 
     path: str = Field(description="Full URI of the source object, the report's source_object key.")
@@ -230,11 +226,11 @@ class SourceObjectMetadata(BaseModel):
 class ExpectationResult(BaseModel):
     """The outcome of one expectation against one source object: one row in the report.
 
-    Filled by ``gx/`` and never touched again. The fields promoted out of GX's
-    nested dicts are exactly the ones something outside ``gx/`` reads: ``severity``
-    and ``success`` drive the policy decision, the rest become report columns.
-    ``exception_message`` is separate from ``success`` on purpose: a rule GX could
-    not run is not a rule that passed.
+    Filled by ``gx/`` and never changed afterwards. The fields lifted out of GX's
+    nested dicts are the ones code outside ``gx/`` reads: ``severity`` and
+    ``success`` drive the policy decision, and the rest become report columns.
+    ``exception_message`` is kept apart from ``success`` because a rule GX could
+    not run did not pass.
     """
 
     success: bool = Field(description="Indicates whether the expectation was met.")
@@ -300,10 +296,10 @@ class ExpectationResult(BaseModel):
 class ActionResult(BaseModel):
     """What was done to the source object, and whether it worked.
 
-    Written twice: ``status`` is ``pending`` when the report records the intent,
-    then the same instance is updated once the action has run and the report is
+    Written twice. ``status`` is ``pending`` when the report records the intent;
+    once the action has run, the same instance is updated and the report is
     merged onto the same row. A row left at ``pending`` means the process died
-    between the two, so this model is deliberately mutable.
+    between the two writes. That is why this model is mutable.
     """
 
     action: ActionName = Field(description="The name of the action that was taken.")
@@ -321,12 +317,12 @@ class ActionResult(BaseModel):
 class SourceObjectResult(BaseModel):
     """Everything that happened to one source object.
 
-    Accretes across the run rather than being built at once: the planner supplies
+    Its fields come from different steps of the run: the planner supplies
     ``source_object``, the reader the counts and timings, ``gx/`` the expectations,
-    the policy the decision, the action its outcome. Most fields are therefore
-    optional because they are genuinely unknown at construction, not from laxity:
-    an object that could not be read has no ``row_count`` and no expectations, yet
-    still has to be recorded and dead-lettered.
+    the policy the decision, and the action its outcome. Many fields are optional
+    because a step may never run: an object that could not be read has no
+    ``row_count`` and no expectations, but it still has to be recorded and
+    dead-lettered.
     """
 
     status: RunObjectStatus = Field(description="The status of the validation operation.")
@@ -361,9 +357,9 @@ class SourceObjectResult(BaseModel):
 class CosmosResult(BaseModel):
     """The result of one run: what the library returns and what the sinks write.
 
-    The reasoning a CLI exit code cannot carry: which objects were checked, what was
-    decided about each, and what was done to them. Run-level verdicts are summaries
-    of ``results`` and nothing else decides them.
+    It carries what a CLI exit code cannot: which objects were checked, what was
+    decided about each, and what was done to them. The run-level verdicts are
+    summaries of ``results``; nothing else decides them.
     """
 
     cosmos_version: str = Field(
