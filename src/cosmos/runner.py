@@ -188,7 +188,7 @@ class Runner:
                     decision=decision,
                     expectations=cosmos_expectation_result,
                     action=action_result,
-                    raw_gx_result=raw_gx_result,  # type: ignore
+                    raw_gx_result=raw_gx_result,
                 )
             )
 
