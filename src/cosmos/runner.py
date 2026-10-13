@@ -76,6 +76,30 @@ class Runner:
         start = perf_counter()
         yield lambda: perf_counter() - start
 
+    def _apply_action(self, action_result: ActionResult, src: str) -> Exception | None:
+        """Performs the planned action and records whether it actually worked.
+
+        Runs once the decision is already final, so a failure here never touches the
+        decision, expectations or statistics already computed for this source object;
+        it is returned instead, so the caller can still record the object as aborted
+        without losing the verdict already reached. It also never raises on its own:
+        any exception from the storage backend is caught and recorded on
+        ``action_result``, so one file's action failing cannot abort the objects still
+        left in the loop.
+        """
+        if action_result.action == ActionName.IGNORE:
+            return None
+
+        try:
+            self.on_failure.handle(src=src)
+            action_result.status = ActionStatus.COMPLETED
+            return None
+        except Exception as e:
+            logger.exception("failed to apply action %s for %s", action_result.action, src)
+            action_result.status = ActionStatus.FAILED
+            action_result.error = str(e)
+            return e
+
     def run(self) -> None:
         source_object_metadata: list[SourceObjectMetadata] = self.storage.glob(self.engine.source.file_path)
         logger.info("resolved %d source object(s) for %s", len(source_object_metadata), self.engine.source.file_path)
@@ -103,18 +127,8 @@ class Runner:
                 decision, action_result = SourceObjectPolicy(on_failure_config=self.on_failure).decide(
                     expectation_results=cosmos_expectation_result
                 )
-
-                try:
-                    if action_result.action != ActionName.IGNORE:
-                        self.on_failure.handle(src=source.path)
-                        action_result.status = ActionStatus.COMPLETED
-                    error_type = None
-                    error_message = None
-                except PermissionError as e:
-                    logger.exception("permission denied while handling failure for %s", source.path)
-                    action_result.status = ActionStatus.FAILED
-                    error_type = type(e).__name__
-                    error_message = str(e)
+                error_type = None
+                error_message = None
             except SourceEmptyError as e:
                 read_duration_sec = None
                 validation_duration_sec = None
@@ -122,6 +136,8 @@ class Runner:
                 statistics = {"row_count": e.row_count, "column_count": e.column_count}
                 cosmos_expectation_result = []
                 decision = None
+                error_type = type(e).__name__
+                error_message = str(e)
                 if self.source.on_empty == "skip":
                     logger.warning("source %s is empty, skipped per on_empty=skip: %s", source.path, e)
                     action_result = ActionResult(
@@ -135,11 +151,6 @@ class Runner:
                 else:
                     logger.warning("source %s is empty and on_empty=fail: %s", source.path, e)
                     action_result = SourceObjectPolicy(on_failure_config=self.on_failure).plan_action(Decision.FAILED)
-                    if action_result.action != ActionName.IGNORE:
-                        self.on_failure.handle(src=source.path)
-                        action_result.status = ActionStatus.COMPLETED
-                    error_type = type(e).__name__
-                    error_message = str(e)
             except Exception as e:
                 logger.exception("failed to process %s", source.path)
                 read_duration_sec = None
@@ -148,32 +159,38 @@ class Runner:
                 statistics = {}
                 cosmos_expectation_result = []
                 decision = None
-                action_result = None
-                if self.on_failure.mode == "any_failure":
-                    action_result = SourceObjectPolicy(on_failure_config=self.on_failure).plan_action(Decision.FAILED)
-                    if action_result.action != ActionName.IGNORE:
-                        self.on_failure.handle(src=source.path)
-                        action_result.status = ActionStatus.COMPLETED
                 error_type = type(e).__name__
                 error_message = str(e)
-            finally:
-                raw_gx_result = gx_result.describe_dict() if gx_result is not None else None
-                source_object_results.append(
-                    SourceObjectResult(
-                        status=RunObjectStatus.COMPLETED if error_type is None else RunObjectStatus.ABORTED,
-                        source_object=source,
-                        row_count=statistics.get("row_count"),
-                        column_count=statistics.get("column_count"),
-                        read_duration_sec=read_duration_sec,
-                        validation_duration_sec=validation_duration_sec,
-                        error_type=error_type,
-                        error_message=error_message,
-                        decision=decision,
-                        expectations=cosmos_expectation_result,
-                        action=action_result,
-                        raw_gx_result=raw_gx_result,  # type: ignore
+                action_result = (
+                    SourceObjectPolicy(on_failure_config=self.on_failure).plan_action(Decision.FAILED)
+                    if self.on_failure.mode == "any_failure"
+                    else ActionResult(
+                        action=ActionName.IGNORE, status=ActionStatus.SKIPPED, dead_letter=None, error=None
                     )
                 )
+
+            action_error = self._apply_action(action_result, source.path)
+            if action_error is not None:
+                error_type = type(action_error).__name__
+                error_message = str(action_error)
+
+            raw_gx_result = gx_result.describe_dict() if gx_result is not None else None
+            source_object_results.append(
+                SourceObjectResult(
+                    status=RunObjectStatus.COMPLETED if error_type is None else RunObjectStatus.ABORTED,
+                    source_object=source,
+                    row_count=statistics.get("row_count"),
+                    column_count=statistics.get("column_count"),
+                    read_duration_sec=read_duration_sec,
+                    validation_duration_sec=validation_duration_sec,
+                    error_type=error_type,
+                    error_message=error_message,
+                    decision=decision,
+                    expectations=cosmos_expectation_result,
+                    action=action_result,
+                    raw_gx_result=raw_gx_result,  # type: ignore
+                )
+            )
 
         cosmos_decision = CosmosPolicy().decide(source_object_results=source_object_results)
 
