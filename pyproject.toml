@@ -221,6 +221,11 @@ choices = [
 ]
 
 [[tool.commitizen.customize.questions]]
+type = "input"
+name = "scope"
+message = "Scope: the part you touched, e.g. runner, gx. using lowercase, '_' and '-' only (enter to skip)"
+
+[[tool.commitizen.customize.questions]]
 type = "confirm"
 name = "breaking"
 message = "Breaking change? Yes if users must change their code or config to upgrade (adds !)"
@@ -230,11 +235,6 @@ default = false
 type = "input"
 name = "subject"
 message = "Subject: one line, imperative, lowercase start, no period, e.g. add retry on failure"
-
-[[tool.commitizen.customize.questions]]
-type = "input"
-name = "scope"
-message = "Scope: the part you touched, e.g. runner, gx. using lowercase, '_' and '-' only (enter to skip)"
 
 [[tool.commitizen.customize.questions]]
 type = "input"
