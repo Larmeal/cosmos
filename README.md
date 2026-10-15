@@ -41,8 +41,6 @@ report on data processing, and is not meant for interactive data exploration.
 | Failure lifecycle | GX reports that a batch failed, but it will not move the offending file to a dead-letter location or record what happened. Pylos does both. |
 | Multi-engine dispatch | The same declarative YAML runs on pandas, Spark or SQL. |
 | Profiling | GX 1.x removed much of the profiling support that 0.x had. Pylos brings it back (planned for v0.6). |
-| Retry safety | Every report row carries `run_id`/`attempt_id` from the first release, so a retried run never writes a duplicate row, in any sink. |
-| Version isolation | Pylos depends on GX permanently and does not hide it behind an interface. All GX calls live in one package (`gx/`), so a GX version bump is fixed in one place. |
 
 ## How it works
 
@@ -70,7 +68,7 @@ same sink. Profiling never fails, so only validation can trigger an action on th
 - A report is always written, separately from the file action, so one pipeline can write to
   BigQuery *and* move the file. The report is written *before* the file is touched.
 - One file is one batch, so every result names the file it came from.
-- Two error classes decide what is retryable. `ConfigError` aborts the run, and `DataError`
+- Two error classes decide what is retryable. `ConfigurationError` aborts the run, and `DataError`
   dead-letters one source file. Any other exception is fatal: it stops the run before any file is
   touched, so a network blip cannot quarantine healthy files.
 - A bad file is skipped and recorded, and the remaining files still run.
@@ -126,9 +124,11 @@ on_failure:
 
 ## Status
 
-Pylos is pre-v0.1 and under active construction. The configuration layer, the GX adapter, local
-storage, the planner and the policy work. Report sinks don't write yet, and the runner doesn't
-finish the loop: it executes no action and returns no result.
+Pylos is pre-v0.1 and under active construction. The local path works end to end with pandas and
+CSV files: configuration, the GX adapter, local storage, the planner, the policy, the file actions
+(`ignore`, `move`, `copy`, `delete`) and the local JSON report sink. `run()` writes the report to
+the sink and returns nothing. GCS storage, the GCS sink and the BigQuery sink are placeholders
+until v0.2.
 
 ## Development
 
