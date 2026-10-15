@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from cosmos.runner import Runner
+from pylos.runner import Runner
 
 pytestmark = pytest.mark.integration
 

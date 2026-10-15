@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-  <b style="font-size: 1.5em; letter-spacing: 0.15em;">✦ COSMOS ✦</b>
+  <b style="font-size: 1.5em; letter-spacing: 0.15em;">✦ PYLOS ✦</b>
 </h1>
 
 <p align="center">
@@ -25,12 +25,12 @@
 
 ## What it is
 
-COSMOS is a data validation and profiling framework for data pipelines. It handles the operational
+Pylos is a data validation and profiling framework for data pipelines. It handles the operational
 work around [Great Expectations](https://greatexpectations.io/): it manages configuration,
 dispatches across engines, decides what happens when validation fails, and reports results to
 pluggable sinks.
 
-COSMOS runs as a layer inside someone else's pipeline (Airflow, Dagster, or a plain script). It is
+Pylos runs as a layer inside someone else's pipeline (Airflow, Dagster, or a plain script). It is
 not a pipeline, a scheduler, or an ETL tool. It is built for automated systems that run daily and
 report on data processing, and is not meant for interactive data exploration.
 
@@ -38,11 +38,11 @@ report on data processing, and is not meant for interactive data exploration.
 
 | | |
 |---|---|
-| Failure lifecycle | GX reports that a batch failed, but it will not move the offending file to a dead-letter location or record what happened. COSMOS does both. |
+| Failure lifecycle | GX reports that a batch failed, but it will not move the offending file to a dead-letter location or record what happened. Pylos does both. |
 | Multi-engine dispatch | The same declarative YAML runs on pandas, Spark or SQL. |
-| Profiling | GX 1.x removed much of the profiling support that 0.x had. COSMOS brings it back (planned for v0.6). |
+| Profiling | GX 1.x removed much of the profiling support that 0.x had. Pylos brings it back (planned for v0.6). |
 | Retry safety | Every report row carries `run_id`/`attempt_id` from the first release, so a retried run never writes a duplicate row, in any sink. |
-| Version isolation | COSMOS depends on GX permanently and does not hide it behind an interface. All GX calls live in one package (`gx/`), so a GX version bump is fixed in one place. |
+| Version isolation | Pylos depends on GX permanently and does not hide it behind an interface. All GX calls live in one package (`gx/`), so a GX version bump is fixed in one place. |
 
 ## How it works
 
@@ -65,7 +65,7 @@ same sink. Profiling never fails, so only validation can trigger an action on th
   not ten minutes into a run.
 - Each expectation has a severity: `critical`, `warning` or `info`. The severity decides whether
   the pipeline acts on a failure.
-- On failure, COSMOS can `ignore`, `move`, `copy` or `delete` the source file. The storage system
+- On failure, Pylos can `ignore`, `move`, `copy` or `delete` the source file. The storage system
   that owns the data does the work: GCS moves its own objects, and the OS moves local files.
 - A report is always written, separately from the file action, so one pipeline can write to
   BigQuery *and* move the file. The report is written *before* the file is touched.
@@ -77,7 +77,7 @@ same sink. Profiling never fails, so only validation can trigger an action on th
 - The library returns the reasoning behind every result. The CLI is a thin wrapper around it.
 - Custom expectations: subclass GX's own `Expectation`, register it, and use its name as an
   `expectation_type` in the contract, the same way as a built-in one.
-- Editor autocomplete comes from a JSON Schema generated from the same Pydantic models COSMOS
+- Editor autocomplete comes from a JSON Schema generated from the same Pydantic models Pylos
   validates with, so the schema always matches what the code accepts.
 
 ```yaml
@@ -110,7 +110,7 @@ on_failure:
 - Data catalog or lineage
 - Alerting, which the orchestrator's `on_failure_callback` handles better
 - Exploratory data analysis
-- A drift platform. COSMOS ships a time-series table, and drift is computed with SQL views over it.
+- A drift platform. Pylos ships a time-series table, and drift is computed with SQL views over it.
 - An in-house expectation vocabulary. GX expectation names pass through unchanged.
 
 ## Roadmap
@@ -126,7 +126,7 @@ on_failure:
 
 ## Status
 
-COSMOS is pre-v0.1 and under active construction. The configuration layer, the GX adapter, local
+Pylos is pre-v0.1 and under active construction. The configuration layer, the GX adapter, local
 storage, the planner and the policy work. Report sinks don't write yet, and the runner doesn't
 finish the loop: it executes no action and returns no result.
 

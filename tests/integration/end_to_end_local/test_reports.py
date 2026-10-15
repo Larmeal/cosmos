@@ -7,9 +7,9 @@ from unittest.mock import ANY
 
 import pytest
 
-from cosmos.exceptions.data_error import SourceEmptyError
-from cosmos.results import ActionName, ActionStatus, Decision, RunObjectStatus, RunStatus, Severity
-from cosmos.runner import Runner
+from pylos.exceptions.data_error import SourceEmptyError
+from pylos.results import ActionName, ActionStatus, Decision, RunObjectStatus, RunStatus, Severity
+from pylos.runner import Runner
 
 ENGINE_ID = "test-end-to-end-local"
 CONTRACT_NAME = "orders"
@@ -99,7 +99,7 @@ def _expected_report(case: Case, source_file: Path) -> dict[str, Any]:
     result.update(case.expected_result or {})
 
     report: dict[str, Any] = {
-        "cosmos_version": version("cosmos"),
+        "pylos_version": version("pylos"),
         "run_id": f"{CONTRACT_NAME}-{ENGINE_ID}",
         "run_ts": ANY,
         "results": [result],
@@ -220,7 +220,7 @@ CASES_REPORT_REFLECTS_SOURCE_STATE = [
 
 # What the report looks like for the "normal" case (the dict built by `_expected_report`).
 # {
-#   "cosmos_version": "0.1.0",
+#   "pylos_version": "0.1.0",
 #   "run_id": "orders-test-end-to-end-local",
 #   "run_ts": "2026-10-10T16:13:45.034915Z",
 #   "results": [

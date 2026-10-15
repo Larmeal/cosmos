@@ -1,1 +1,1 @@
-"""Tests for cosmos.gx.translation: GX result -> CosmosResult / ExpectationResult."""
+"""Tests for pylos.gx.translation: GX result -> PylosResult / ExpectationResult."""

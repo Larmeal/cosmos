@@ -1,1 +1,1 @@
-"""Tests for cosmos.results: Pydantic model validation, defaults, and rollups."""
+"""Tests for pylos.results: Pydantic model validation, defaults, and rollups."""

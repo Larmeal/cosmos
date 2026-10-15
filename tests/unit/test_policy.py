@@ -1,1 +1,1 @@
-"""Tests for cosmos.policy: expectation results -> pass/warn/fail decision."""
+"""Tests for pylos.policy: expectation results -> pass/warn/fail decision."""

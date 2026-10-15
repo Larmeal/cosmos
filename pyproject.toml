@@ -1,5 +1,5 @@
 [project]
-name = "cosmos"
+name = "pylos"
 version = "0.0.1"
 description = "A framework for encapsulating Great Expectations within data pipelines, providing reusable validation layers, expectation suite management, and seamless pipeline integration."
 readme = "README.md"
@@ -130,7 +130,7 @@ Ask "what does a user of the library notice?" and take the first match.
               Runtime dependencies and packaging belong to build.
               Choose when: no other type fits and the library behaves the same.
               Rule:        if only contributors benefit, not people who install
-                           cosmos, it is chore, even when it adds a new tool or
+                           pylos, it is chore, even when it adds a new tool or
                            workflow step, and however large the change is.
               Warning:     never use chore for a bug fix, or the fix will not be
                            released and will not appear in the changelog.

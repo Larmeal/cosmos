@@ -1,4 +1,4 @@
-# The smallest config COSMOS will run.
+# The smallest config Pylos will run.
 #
 # Validates every CSV matching the glob, moves any that fail to a dead-letter
 # directory, and writes one JSON report per run.

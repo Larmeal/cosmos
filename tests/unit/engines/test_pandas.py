@@ -1,1 +1,1 @@
-"""Tests for cosmos.engines.pandas: reading a source object into a dataframe."""
+"""Tests for pylos.engines.pandas: reading a source object into a dataframe."""

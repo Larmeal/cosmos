@@ -1,1 +1,1 @@
-"""Tests for cosmos.loader: config file -> validated settings."""
+"""Tests for pylos.loader: config file -> validated settings."""

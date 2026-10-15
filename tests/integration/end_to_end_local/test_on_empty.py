@@ -9,9 +9,9 @@ from typing import Any, NamedTuple
 
 import pytest
 
-from cosmos.exceptions.data_error import SourceEmptyError
-from cosmos.results import RunObjectStatus, RunStatus
-from cosmos.runner import Runner
+from pylos.exceptions.data_error import SourceEmptyError
+from pylos.results import RunObjectStatus, RunStatus
+from pylos.runner import Runner
 from tests.integration.end_to_end_local.test_on_failure import MOCKED_CSV_NAME
 
 pytestmark = pytest.mark.integration
@@ -116,7 +116,7 @@ CASES_EMPTY_SOURCE = [
 
 # What the report looks like for the "normal" case (the dict built by `_expected_report`).
 # {
-#   "cosmos_version": "0.1.0",
+#   "pylos_version": "0.1.0",
 #   "run_id": "orders-test-end-to-end-local",
 #   "run_ts": "2026-10-10T16:13:45.034915Z",
 #   "results": [

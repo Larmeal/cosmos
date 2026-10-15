@@ -1,4 +1,4 @@
-# COSMOS configuration: annotated reference
+# Pylos configuration: annotated reference
 #
 # Every field is shown here with its allowed values. Fields marked [v0.x] are not
 # available yet; see PROJECT_SUMMARY.md for the roadmap.
@@ -25,7 +25,7 @@ source:
   file_format: csv                    # csv | parquet
   file_path: data/test_*.csv          # glob; matches many files, each validated separately
 
-  # What it means when the glob matches nothing. COSMOS cannot tell "no data
+  # What it means when the glob matches nothing. Pylos cannot tell "no data
   # today" from "upstream is late", so declare which one this pipeline expects.
   on_empty: fail                      # fail | skip
 
@@ -89,7 +89,7 @@ validate:
         severity: warning             # warning does not trigger the failure action
 
   # An HTML view of the results, rendered by Great Expectations. Off by default:
-  # nothing is written and no directory is created. COSMOS's own reports under
+  # nothing is written and no directory is created. Pylos's own reports under
   # `report:` are the source of truth, this is only for humans who want to
   # browse results.
   data_docs:

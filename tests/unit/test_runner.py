@@ -1,1 +1,1 @@
-"""Tests for cosmos.runner: orchestration of plan -> read -> validate -> act."""
+"""Tests for pylos.runner: orchestration of plan -> read -> validate -> act."""

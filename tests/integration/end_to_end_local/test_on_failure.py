@@ -22,10 +22,10 @@ from typing import Any, NamedTuple
 
 import pytest
 
-from cosmos.engines import BaseEngine
-from cosmos.results import ActionName, ActionStatus, Decision, RunObjectStatus, RunStatus, Severity
-from cosmos.runner import Runner
-from cosmos.storages.local import LocalStorage
+from pylos.engines import BaseEngine
+from pylos.results import ActionName, ActionStatus, Decision, RunObjectStatus, RunStatus, Severity
+from pylos.runner import Runner
+from pylos.storages.local import LocalStorage
 
 pytestmark = pytest.mark.integration
 
@@ -73,7 +73,7 @@ def _deny_action(monkeypatch: pytest.MonkeyPatch, action: ActionName) -> None:
 
 # What the report looks like for the "normal" case (the dict built by `_expected_report`).
 # {
-#   "cosmos_version": "0.1.0",
+#   "pylos_version": "0.1.0",
 #   "run_id": "orders-test-end-to-end-local",
 #   "run_ts": "2026-10-10T16:13:45.034915Z",
 #   "results": [

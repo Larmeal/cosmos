@@ -1,1 +1,1 @@
-"""Tests for cosmos.sinks.base: the sink interface / shared behavior."""
+"""Tests for pylos.sinks.base: the sink interface / shared behavior."""

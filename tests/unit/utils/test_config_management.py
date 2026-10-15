@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 import pytest
 
-from cosmos.utils.config_management import dict_deep_merge
+from pylos.utils.config_management import dict_deep_merge
 
 
 class Case(NamedTuple):

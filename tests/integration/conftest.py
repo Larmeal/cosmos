@@ -5,10 +5,10 @@ from typing import Any
 
 import pytest
 
-from cosmos.engines.pandas import PandasEngine
-from cosmos.results import ActionName, Severity
-from cosmos.runner import Runner
-from cosmos.utils.config_management import dict_deep_merge
+from pylos.engines.pandas import PandasEngine
+from pylos.results import ActionName, Severity
+from pylos.runner import Runner
+from pylos.utils.config_management import dict_deep_merge
 
 ENGINE_ID = "test-end-to-end-local"
 CONTRACT_NAME = "orders"

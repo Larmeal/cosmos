@@ -1,1 +1,1 @@
-"""Tests for cosmos.planner: resolving the source glob into planned objects."""
+"""Tests for pylos.planner: resolving the source glob into planned objects."""

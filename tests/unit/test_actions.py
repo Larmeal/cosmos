@@ -1,9 +1,9 @@
-"""Tests for cosmos.actions: ignore / delete / move / copy on a source object."""
+"""Tests for pylos.actions: ignore / delete / move / copy on a source object."""
 
 import pytest
 from pydantic import ValidationError
 
-from cosmos.actions import IgnoreFailureAction, MoveFailureAction
+from pylos.actions import IgnoreFailureAction, MoveFailureAction
 
 
 def test_mode_defaults_to_decision() -> None:

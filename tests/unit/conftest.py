@@ -1,4 +1,4 @@
-"""Shared fixtures for the COSMOS test suite.
+"""Shared fixtures for the Pylos test suite.
 
 Fixtures defined here are available to every test under ``tests/`` without import.
 Put cross-cutting factories here (sample Pydantic models, fake storage, etc.);
@@ -10,13 +10,13 @@ import logging
 
 import pytest
 
-from cosmos.results import (
+from pylos.results import (
     ActionName,
     ActionResult,
     ActionStatus,
-    CosmosResult,
     Decision,
     ExpectationResult,
+    PylosResult,
     RunObjectStatus,
     RunStatus,
     Severity,
@@ -28,15 +28,15 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def cosmos_result_with_failures() -> CosmosResult:
-    """A CosmosResult with every field populated: one object that was validated and failed.
+def pylos_result_with_failures() -> PylosResult:
+    """A PylosResult with every field populated: one object that was validated and failed.
 
     ``error_type`` and ``error_message`` stay ``None`` on purpose: they describe an object
     that could not be read (``RunObjectStatus.ABORTED``), which contradicts a completed
     object whose data simply failed its expectations.
     """
-    return CosmosResult(
-        cosmos_version="0.0.0-test",
+    return PylosResult(
+        pylos_version="0.0.0-test",
         run_id="test-run-id-with-failures",
         run_ts=datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC),
         results=[
@@ -92,14 +92,14 @@ def cosmos_result_with_failures() -> CosmosResult:
 
 
 @pytest.fixture
-def cosmos_result_with_success() -> CosmosResult:
-    """A CosmosResult with every field populated: one object that was validated and passed.
+def pylos_result_with_success() -> PylosResult:
+    """A PylosResult with every field populated: one object that was validated and passed.
 
     ``error_type``, ``error_message`` and ``action.error`` stay ``None``, and ``action.dead_letter``
     too: nothing went wrong, and a passed object is never acted on (``IGNORE`` / ``SKIPPED``).
     """
-    return CosmosResult(
-        cosmos_version="0.0.0-test",
+    return PylosResult(
+        pylos_version="0.0.0-test",
         run_id="test-run-id-with-success",
         run_ts=datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC),
         results=[
