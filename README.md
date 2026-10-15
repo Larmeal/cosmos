@@ -25,7 +25,7 @@
 
 ## What it is
 
-Pylos is a data validation and profiling framework for data pipelines. It handles the operational
+Pylos (pronounced "PY-los") is a data validation and profiling framework for data pipelines. It handles the operational
 work around [Great Expectations](https://greatexpectations.io/): it manages configuration,
 dispatches across engines, decides what happens when validation fails, and reports results to
 pluggable sinks.
