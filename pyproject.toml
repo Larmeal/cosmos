@@ -1,6 +1,6 @@
 [project]
 name = "cosmos"
-version = "0.1.0"
+version = "0.0.1"
 description = "A framework for encapsulating Great Expectations within data pipelines, providing reusable validation layers, expectation suite management, and seamless pipeline integration."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -124,10 +124,14 @@ Ask "what does a user of the library notice?" and take the first match.
               Example:     test(runner): cover the on_failure modes
 
   chore       bumps nothing, and is left out of the changelog
-              Housekeeping that users never see: development dependencies,
-              tooling and lint config, hooks, release files, formatting.
+              Housekeeping that only contributors see: development dependencies,
+              tooling and lint config, hooks, release files, formatting, and
+              how commits themselves are written (commitizen, prek).
               Runtime dependencies and packaging belong to build.
               Choose when: no other type fits and the library behaves the same.
+              Rule:        if only contributors benefit, not people who install
+                           cosmos, it is chore, even when it adds a new tool or
+                           workflow step, and however large the change is.
               Warning:     never use chore for a bug fix, or the fix will not be
                            released and will not appear in the changelog.
               Example:     chore: bump ruff in prek config
@@ -203,13 +207,13 @@ changelog_pattern = '^((BREAKING[\-\ ]CHANGE|\w+)(\(.+\))?!?):'
 [[tool.commitizen.customize.questions]]
 type = "list"
 name = "change_type"
-message = "Select the type of change"
+message = "Select the type of change\n\n"
 choices = [
     { value = "feat", name = "feat: new capability users can call or see (bumps MINOR)" },
     { value = "fix", name = "fix: corrects wrong behaviour users would notice (bumps PATCH)" },
     { value = "refactor", name = "refactor: restructure only, behaviour unchanged (bumps PATCH)" },
     { value = "perf", name = "perf: same behaviour, faster or lighter (bumps PATCH)" },
-    { value = "chore", name = "chore: dev tooling and housekeeping, never a bug fix (no bump)" },
+    { value = "chore", name = "chore: dev tooling, lint/commit config, housekeeping; never a bug fix (no bump)" },
     { value = "docs", name = "docs: README, docstrings or comments only (no bump)" },
     { value = "test", name = "test: tests only, nothing under src changes (no bump)" },
     { value = "ci", name = "ci: CI workflow and pipeline files only (no bump)" },
@@ -217,9 +221,10 @@ choices = [
 ]
 
 [[tool.commitizen.customize.questions]]
-type = "input"
-name = "scope"
-message = "Scope: the part you touched, e.g. runner, gx. Lowercase, _ and - only (enter to skip)"
+type = "confirm"
+name = "breaking"
+message = "Breaking change? Yes if users must change their code or config to upgrade (adds !)"
+default = false
 
 [[tool.commitizen.customize.questions]]
 type = "input"
@@ -228,14 +233,14 @@ message = "Subject: one line, imperative, lowercase start, no period, e.g. add r
 
 [[tool.commitizen.customize.questions]]
 type = "input"
+name = "scope"
+message = "Scope: the part you touched, e.g. runner, gx. using lowercase, '_' and '-' only (enter to skip)"
+
+[[tool.commitizen.customize.questions]]
+type = "input"
 name = "body"
 message = "Body: why the change was needed and what to watch out for (enter to skip)"
 
-[[tool.commitizen.customize.questions]]
-type = "confirm"
-name = "breaking"
-message = "Breaking change? Yes if users must change their code or config to upgrade (adds !)"
-default = false
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
