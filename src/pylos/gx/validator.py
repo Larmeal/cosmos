@@ -84,7 +84,7 @@ class GXValidator:
         """Create a GX context: in memory, or file-backed under ``data_docs.store_path/gx``."""
         from great_expectations import get_context
 
-        if mode == "file":
+        if mode == "file" and self.config.data_docs.store_path:
             return get_context(mode=mode, context_root_dir=Path(self.config.data_docs.store_path).joinpath("gx"))
         return get_context(mode=mode)
 
