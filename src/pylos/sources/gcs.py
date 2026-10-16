@@ -1,3 +1,5 @@
+"""The Google Cloud Storage source. Planned, not usable yet."""
+
 from __future__ import annotations
 
 from functools import cached_property

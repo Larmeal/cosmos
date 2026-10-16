@@ -1,3 +1,5 @@
+"""The vocabulary of a report: ``PylosResult`` and the objects and enums inside it."""
+
 import datetime
 from enum import StrEnum
 from importlib.metadata import version
@@ -15,7 +17,7 @@ class ActionName(StrEnum):
     The YAML author picks one of these four, and ``policy.py`` copies that
     same value onto the ``ActionResult`` it plans, unchanged.
 
-    Values:
+    Attributes:
         IGNORE: Leave the file exactly where it is. Also the value
             ``policy.py`` uses when nothing needs to happen at all, not only
             when the user configured it explicitly.
@@ -23,7 +25,7 @@ class ActionName(StrEnum):
         MOVE: Relocate the file into ``dead_letter``, removing the original.
         COPY: Copy the file into ``dead_letter``, leaving the original in place.
 
-    Example:
+    Examples:
         >>> ActionName.MOVE
         <ActionName.MOVE: 'move'>
 
@@ -50,14 +52,14 @@ class ActionStatus(StrEnum):
     A row still at ``PENDING`` in a written report means the process died
     between planning the action and carrying it out.
 
-    Values:
+    Attributes:
         PENDING: The action is due but has not run yet.
         SKIPPED: Nothing needs to touch the file, e.g. the decision was
             ``PASSED`` or ``WARNED``.
         COMPLETED: The runner performed the action and it succeeded.
         FAILED: The runner tried to perform the action and it raised.
 
-    Example:
+    Examples:
         >>> ActionStatus.PENDING
         <ActionStatus.PENDING: 'pending'>
 
@@ -78,7 +80,7 @@ class Decision(StrEnum):
     run at all. An object that could not be read has no ``Decision``, because
     there was no data to judge (see ``RunObjectStatus.ABORTED``).
 
-    Values:
+    Attributes:
         PASSED: No expectation failed, or only ``info`` ones did.
         WARNED: The worst failing expectation was ``warning``.
         FAILED: At least one ``critical`` expectation failed.
@@ -91,7 +93,7 @@ class Decision(StrEnum):
     ``RunStatus`` answers a different question, "did Pylos do its job", for
     whoever runs the pipeline.
 
-    Example:
+    Examples:
         >>> Decision.FAILED
         <Decision.FAILED: 'failed'>
 
@@ -112,7 +114,7 @@ class RunStatus(StrEnum):
     still ``COMPLETED``, because Pylos read and validated all of them
     successfully.
 
-    Values:
+    Attributes:
         COMPLETED: Every object completed, including an empty, allowed glob.
         PARTIAL: A mix of completed and aborted objects.
         ABORTED: Every object aborted.
@@ -127,7 +129,7 @@ class RunStatus(StrEnum):
     Read by whoever runs the pipeline; ``Decision`` is read by whoever owns
     the data.
 
-    Example:
+    Examples:
         >>> RunStatus.PARTIAL
         <RunStatus.PARTIAL: 'partial'>
 
@@ -145,7 +147,7 @@ class RunObjectStatus(StrEnum):
 
     Set once per object, before ``Decision`` is even known.
 
-    Values:
+    Attributes:
         COMPLETED: The object was read and every expectation ran, whatever
             the result was.
         ABORTED: Something raised before that point instead, e.g. a corrupt
@@ -155,7 +157,7 @@ class RunObjectStatus(StrEnum):
     ``RunStatus`` is the rollup of these two values across every object in
     the run.
 
-    Example:
+    Examples:
         >>> RunObjectStatus.ABORTED
         <RunObjectStatus.ABORTED: 'aborted'>
 
@@ -178,12 +180,12 @@ class Severity(StrEnum):
     An equivalent enum here keeps that boundary. ``gx/validator.py``'s
     ``_map_severity`` is the only place that translates between the two.
 
-    Values:
+    Attributes:
         CRITICAL: A failure triggers the configured ``on_failure`` action.
         WARNING: A failure is recorded but the file is left alone.
         INFO: A failure is recorded as a note for a person, nothing more.
 
-    Example:
+    Examples:
         >>> Severity.CRITICAL
         <Severity.CRITICAL: 'critical'>
 

@@ -1,3 +1,5 @@
+"""Errors about the data inside a source file, such as an empty file."""
+
 from .base import DataError
 
 

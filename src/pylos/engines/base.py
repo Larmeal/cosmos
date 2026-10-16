@@ -1,3 +1,5 @@
+"""The shape every config file shares: ``id``, ``source``, ``validation``, ``on_failure`` and ``report``. Each engine subclasses ``BaseEngine``."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

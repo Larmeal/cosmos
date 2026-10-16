@@ -1,3 +1,5 @@
+"""The ``validation`` section of a config: the contract, its expectations and the Data Docs setting."""
+
 import hashlib
 from pathlib import Path
 from typing import Any, Literal, Self

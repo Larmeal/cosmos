@@ -1,3 +1,5 @@
+"""The pandas engine, which reads each CSV file into a DataFrame."""
+
 from __future__ import annotations
 
 import logging
@@ -5,6 +7,7 @@ from pathlib import Path
 from typing import Any, Literal, Self
 
 import pandas as pd
+from pydantic import Field
 
 from pylos.engines.base import BaseEngine
 from pylos.exceptions.data_error import SourceEmptyError
@@ -15,7 +18,9 @@ logger = logging.getLogger(__name__)
 class PandasEngine(BaseEngine):
     """Engine that reads each source object into a pandas DataFrame."""
 
-    engine: Literal["pandas"]
+    engine: Literal["pandas"] = Field(
+        description="Engine identifier, fixed to 'pandas'. Reads each source object with pandas."
+    )
     dataframe: pd.DataFrame | None = None
 
     def is_empty(self) -> bool:

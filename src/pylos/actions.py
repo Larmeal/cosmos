@@ -1,3 +1,5 @@
+"""What happens to a source file whose data failed: ignore, move, copy or delete. There is one config class per action, and ``OnFailureActionConfig`` picks one from the ``action`` field."""
+
 from abc import ABC, abstractmethod
 from typing import Annotated, Literal
 
@@ -154,3 +156,4 @@ OnFailureActionConfig = Annotated[
     IgnoreFailureAction | DeleteFailureAction | MoveFailureAction | CopyFailureAction,
     Field(discriminator="action"),
 ]
+"""The ``on_failure`` section of a config. Its ``action`` field picks the class: ``ignore``, ``delete``, ``move`` or ``copy``."""

@@ -1,3 +1,5 @@
+"""Runs one dataframe through Great Expectations against a contract."""
+
 from __future__ import annotations
 
 import logging

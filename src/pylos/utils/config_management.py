@@ -28,7 +28,7 @@ def dict_deep_merge(obj: dict, replaced_key: dict, deep_copy: bool = True) -> di
         The updated dict. A new object when ``deep_copy`` is True, otherwise the
         same ``obj`` that was passed in.
 
-    Example:
+    Examples:
         >>> cfg = {"a": {"b": 1}, "c": 2}
         >>> dict_deep_merge(cfg, {"b": 9})
         {'a': {'b': 9}, 'c': 2}

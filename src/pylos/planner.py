@@ -1,3 +1,5 @@
+"""Resolves a config against reality: which files the glob matches, and a printable plan of the work."""
+
 from __future__ import annotations
 
 import re
@@ -37,8 +39,8 @@ def _elide_path(path: str) -> str:
         otherwise its rightmost ``_PATH_WIDTH - 1`` characters prefixed with
         "…".
 
-    Example:
-        A 79-character absolute path becomes::
+    Examples:
+        A 79-character absolute path becomes:
 
             >>> _elide_path("C:/Users/armlo/.../cosmos/data/test_1.csv")
             '…t/personal-project/cosmos/data/test_1.csv'
@@ -80,9 +82,9 @@ def _relative_to_cwd(path: str) -> str:
         local path outside the current tree (a different drive on Windows,
         or anywhere ``Path.relative_to`` would raise).
 
-    Example:
+    Examples:
         Run from the project root, with the CWD at
-        ``.../cosmos``::
+        ``.../cosmos``:
 
             >>> _relative_to_cwd(".../cosmos/data/test_1.csv")
             'data/test_1.csv'
@@ -122,7 +124,7 @@ def _human_size(size_bytes: float) -> str:
         Anything of a gigabyte or more stays in GB, even with more than three
         digits before the point.
 
-    Example:
+    Examples:
         >>> _human_size(410)
         '410 B'
         >>> _human_size(2048)
@@ -167,7 +169,7 @@ def _render_value(value: Any) -> str:
         A bool is checked first so it renders as YAML's ``true`` instead of
         falling through to ``str(value)`` as ``"True"``.
 
-    Example:
+    Examples:
         >>> _render_value(True)
         'true'
         >>> _render_value("utf-8")
@@ -218,7 +220,7 @@ def _needs_quotes(value: str) -> bool:
         ``YYYY-MM-DD`` date. False for an ordinary identifier like a column
         name, which is unambiguous and reads better bare.
 
-    Example:
+    Examples:
         >>> _needs_quotes("col_int64")
         False
         >>> _needs_quotes("2000-01-01 00:00:00")
@@ -268,7 +270,7 @@ def _render_kwarg_scalar(value: Any) -> str:
         it is not, or ``_render_value(value)`` for anything that is not a
         string.
 
-    Example:
+    Examples:
         >>> _render_kwarg_scalar("col_int64")
         'col_int64'
         >>> _render_kwarg_scalar("2000-01-01 00:00:00")
@@ -314,7 +316,7 @@ def _render_kwargs_lines(kwargs: dict[str, Any], indent: str) -> list[str]:
         line plus one ``"  - <name>"`` line per column, indented two more
         spaces.
 
-    Example:
+    Examples:
         >>> _render_kwargs_lines(
         ...     {"column": "col_int64", "min_value": 0, "max_value": 5},
         ...     indent="          ",
@@ -367,7 +369,7 @@ def _box(title: str, rows: list[tuple[str, str]]) -> list[str]:
         per row, and a bottom border. Every line is exactly ``_BOX_WIDTH``
         characters, so stacked boxes have a straight right edge.
 
-    Example:
+    Examples:
         >>> for line in _box("on failure", [("action", "move"), ("dead letter", "output/dead-letters")]):
         ...     print(line)
         ╭─ on failure ───────────────────────────────────────────────────────────────╮
@@ -423,9 +425,9 @@ class Plan:
         data_docs_enabled: Whether GX will also render its HTML view.
         source_objects: What the glob actually found, sorted by path.
 
-    Example:
+    Examples:
         ``Planner.plan()`` normally builds it, but a test can construct one
-        directly from fabricated data, without touching a real filesystem::
+        directly from fabricated data, without touching a real filesystem:
 
             >>> plan = Plan(
             ...     engine_id="test_config",
@@ -470,7 +472,7 @@ class Plan:
             (``_SEVERITY_ORDER``), in declaration order within each group.
             The list is new; the contract's own list is not modified.
 
-        Example:
+        Examples:
             A contract declaring ``[warning_rule, critical_rule]`` (in that
             order) returns ``[critical_rule, warning_rule]``. Severity wins
             over declaration order, even though ``critical_rule`` was
@@ -500,9 +502,9 @@ class Plan:
             on the rest), so ``{"delimiter": ",", "encoding": "utf-8"}``
             renders as two lines, one option each.
 
-        Example:
+        Examples:
             For a CSV source with two options and a wildcard pattern, the
-            box's rows read (label, value) as::
+            box's rows read (label, value) as:
 
                 ("storage", "local")
                 ("reader", "pandas.read_csv")
@@ -556,8 +558,8 @@ class Plan:
             ``_OBJECT_PREVIEW`` objects, a final "… N more" line. When the
             glob matched nothing, only a blank line and "0 objects resolved".
 
-        Example:
-            With ``full=False`` and three objects found::
+        Examples:
+            With ``full=False`` and three objects found:
 
                     3 objects resolved · 1.2 KB
 
@@ -608,9 +610,9 @@ class Plan:
             row, so a contract with only critical rules shows no "0 warning"
             line.
 
-        Example:
+        Examples:
             For a contract with 8 critical rules and 1 warning rule, the rows
-            (label, value) read::
+            (label, value) read:
 
                 ("contract", "test_1_schema")
                 ("rules", "9 totals")
@@ -658,9 +660,9 @@ class Plan:
             line, and an indented ``kwargs:`` block if it has kwargs. Empty
             if the contract has no expectations.
 
-        Example:
+        Examples:
             A single ``expect_column_values_to_not_be_null`` critical rule
-            on ``col_int64`` renders as::
+            on ``col_int64`` renders as:
 
                     critical · 1 rule
 
@@ -712,7 +714,7 @@ class Plan:
             ``dead letter`` row only when ``self.on_failure`` is a
             ``RelocateFailureAction``.
 
-        Example:
+        Examples:
             For ``on_failure: {action: move, dead_letter: output/dead-letters/}``,
             the rows read ``[("action", "move"), ("dead letter", "output/dead-letters/")]``;
             for ``action: ignore``, just ``[("action", "ignore")]``.
@@ -742,7 +744,7 @@ class Plan:
             sink's ``path`` if it has one, otherwise its ``storage``) and an
             ``expectations`` row.
 
-        Example:
+        Examples:
             For a local file sink at ``output/reports/`` and a 9-rule
             contract, the rows read
             ``[("save on", "output/reports/"), ("expectations", "9")]``.
@@ -804,7 +806,7 @@ class Plan:
                 the start of the call, before any line is built, so a bad
                 timezone never produces a half-rendered plan.
 
-        Example:
+        Examples:
             >>> print(Planner(engine).plan().render())
               PYLOS plan · test_config · pandas
             <BLANKLINE>
@@ -856,7 +858,7 @@ class Planner:
     ``Plan`` be rendered several times (different ``timezone``,
     ``full_rules``, ...) without globbing again.
 
-    Example:
+    Examples:
         >>> from pylos.loader import from_yaml
         >>> engine = from_yaml("data/template_test.yml")
         >>> print(Planner(engine).plan().render())
@@ -902,7 +904,7 @@ class Planner:
             ``Plan._object_lines`` and the full listing the same on every
             run, whatever order the backend listed them in.
 
-        Example:
+        Examples:
             For ``source.file_path: "data/test_*.csv"`` matching three
             files, this returns three items sorted as
             ``test_1.csv, test_2.csv, test_3.csv``, each with its own
@@ -932,7 +934,7 @@ class Planner:
             result of ``prepare_source_metadata()``. Call ``.render()`` on it
             to get the printable plan.
 
-        Example:
+        Examples:
             >>> plan = Planner(engine).plan()
             >>> plan.engine_id
             'test_config'

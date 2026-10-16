@@ -1,6 +1,10 @@
+"""The local report sink, which writes one JSON file per run."""
+
 import logging
 from pathlib import Path
 from typing import Literal
+
+from pydantic import Field
 
 from pylos.results import PylosResult
 from pylos.sinks.base import BaseFileFormat
@@ -11,8 +15,8 @@ logger = logging.getLogger(__name__)
 class LocalSink(BaseFileFormat):
     """Writes the report as one JSON file on the local filesystem.
 
-    Example:
-        In the pipeline YAML::
+    Examples:
+        In the pipeline YAML:
 
             report:
               storage: local
@@ -20,7 +24,7 @@ class LocalSink(BaseFileFormat):
               path: output/reports/
     """
 
-    storage: Literal["local"]
+    storage: Literal["local"] = Field(description="Storage backend type, fixed to 'local'.")
 
     def _handle(self, result: PylosResult) -> str:
         """Serialize the whole result to JSON with ``model_dump_json()``.

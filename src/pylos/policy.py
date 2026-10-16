@@ -1,3 +1,5 @@
+"""Turns validation results into decisions: the verdict on the data, and what to do with the file."""
+
 from pylos.actions import IgnoreFailureAction, OnFailureActionConfig, RelocateFailureAction
 from pylos.results import (
     ActionName,

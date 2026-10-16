@@ -1,3 +1,5 @@
+"""The base classes every report sink builds on."""
+
 from abc import ABC, abstractmethod
 from typing import Literal
 
@@ -28,11 +30,15 @@ class BaseSink(ABC, BaseModel):
 class BaseFileFormat(BaseSink):
     """Base for sinks that write the report as a file at ``path``. ``format`` must be ``"file"``."""
 
-    format: Literal["file"]
+    format: Literal["file"] = Field(
+        description="Report format, fixed to 'file': the report is written as one file at ``path``."
+    )
     path: str = Field(description="Path to store the report file.")
 
 
 class BaseTableFormat(BaseSink):
     """Base for sinks that write the report as rows in a table. ``format`` must be ``"table"``."""
 
-    format: Literal["table"]
+    format: Literal["table"] = Field(
+        description="Report format, fixed to 'table': the report is written as rows in a table."
+    )

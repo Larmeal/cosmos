@@ -1,3 +1,6 @@
+"""The base error classes: ``PylosError``, ``ConfigurationError`` and ``DataError``."""
+
+
 class PylosError(Exception):
     """Base class for every error Pylos raises.
 

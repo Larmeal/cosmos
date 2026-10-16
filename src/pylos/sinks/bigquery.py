@@ -1,4 +1,8 @@
+"""The BigQuery report sink. Planned, not usable yet."""
+
 from typing import Literal
+
+from pydantic import Field
 
 from pylos.sinks.base import BaseTableFormat
 
@@ -11,7 +15,7 @@ class BigQuerySink(BaseTableFormat):
     abstract class``.
     """
 
-    storage: Literal["bigquery"]
+    storage: Literal["bigquery"] = Field(description="Storage backend type, fixed to 'bigquery'.")
 
     def handle(self) -> None:
         """Placeholder that always raises ``NotImplementedError``. Not part of the ``BaseSink`` interface."""

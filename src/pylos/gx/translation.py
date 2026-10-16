@@ -1,3 +1,5 @@
+"""Converts a Great Expectations result into Pylos's own ``ExpectationResult`` rows."""
+
 import logging
 from typing import Any
 

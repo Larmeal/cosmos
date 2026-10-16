@@ -1,3 +1,5 @@
+"""Runs a pipeline end to end: read, validate, decide, act and report."""
+
 from __future__ import annotations
 
 import datetime
@@ -48,7 +50,7 @@ class Runner:
     loop moves on to the next object. ``on_failure.mode`` decides whether an
     aborted object is acted on.
 
-    Example:
+    Examples:
         >>> from pylos.loader import from_yaml
         >>> Runner(from_yaml("data/template_test.yml")).run()
     """
@@ -111,7 +113,7 @@ class Runner:
             The clock keeps running after the block, so call it right after the
             block ends.
 
-        Example:
+        Examples:
             >>> with self._timer() as elapsed:
             ...     do_work()
             >>> seconds = elapsed()

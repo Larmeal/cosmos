@@ -1,3 +1,5 @@
+"""The storage backend for the local filesystem."""
+
 from __future__ import annotations
 
 import datetime

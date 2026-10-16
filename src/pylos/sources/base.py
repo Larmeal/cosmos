@@ -1,7 +1,8 @@
+"""The fields every source shares."""
+
 from __future__ import annotations
 
 from abc import ABC
-from textwrap import dedent
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,16 +42,10 @@ class FileBaseConfig(BaseConfig):
     )
     options: dict[str, Any] = Field(
         default_factory=dict,
-        description=dedent(
-            """
-        Additional engine-specific reading options (e.g., delimiter, header). You can specify any options that are supported by the underlying data reading engine.
-
-        Example: For CSV files in pandas, you might specify
-            {
-                'delimiter': ',',
-                'header': True
-            }
-        See https://pandas.pydata.org/docs/reference/io.html for the pandas reader options.
-        """,
-        ).strip(),
+        description=(
+            "Additional engine-specific reading options, passed straight to the engine's reader. "
+            "Any option the underlying reader supports works here. "
+            "For CSV files in pandas this goes to ``pd.read_csv``, so ``{delimiter: ',', header: 0}`` is valid. "
+            "See https://pandas.pydata.org/docs/reference/io.html for the pandas reader options."
+        ),
     )

@@ -1,4 +1,8 @@
+"""The Google Cloud Storage report sink. Planned, not usable yet."""
+
 from typing import Literal
+
+from pydantic import Field
 
 from pylos.sinks.base import BaseFileFormat
 
@@ -11,7 +15,7 @@ class GCSSink(BaseFileFormat):
     abstract class``.
     """
 
-    storage: Literal["gcs"]
+    storage: Literal["gcs"] = Field(description="Storage backend type, fixed to 'gcs'.")
 
     def handle(self) -> None:
         """Placeholder that always raises ``NotImplementedError``. Not part of the ``BaseSink`` interface."""
