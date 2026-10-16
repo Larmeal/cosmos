@@ -9,27 +9,48 @@ edit_uri: edit/main/docs/
 # is caught on the pull request instead of on the published site.
 strict: true
 
+validation:
+  # A link to a heading that does not exist fails the build, so renaming a heading cannot
+  # silently break the links that point at it.
+  anchors: warn
+
 nav:
   - Home: index.md
-  - Getting started: getting-started.md
+  - Getting started: getting-started/index.md
   - Concepts:
+      - concepts/index.md
       - Pipeline: concepts/pipeline.md
       - Failure policy: concepts/failure-policy.md
       - Reporting: concepts/reporting.md
-  - Configuration: configuration.md
+  - Configuration:
+      - configuration/index.md
+      - Source: configuration/source.md
+      - Validation: configuration/validation.md
+      - On failure: configuration/on-failure.md
+      - Report: configuration/report.md
+      - Planned keys: configuration/planned.md
   - API Reference:
       - reference/index.md
       - Modules: reference/*
 
+extra_css:
+  - stylesheets/extra.css
+
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  icon:
+    repo: fontawesome/brands/github
   features:
     - content.action.edit
     - content.code.annotate
     - content.code.copy
+    - content.tabs.link
     - navigation.footer
     - navigation.path
     - navigation.tabs
+    - navigation.top
     - navigation.tracking
     - search.highlight
     - search.suggest
@@ -74,6 +95,11 @@ plugins:
             allow_inspection: false
             docstring_style: google
             docstring_section_style: spacy
+            docstring_options:
+              # Returns: is prose, and its type comes from the signature. Without these two,
+              # every line becomes its own return row and "word: text" is read as a name.
+              returns_multiple_items: false
+              returns_named_value: false
             filters: ["!^_"]
             inherited_members: false
             members_order: source
@@ -86,9 +112,9 @@ plugins:
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             signature_crossrefs: true
-          extensions:
-            - griffe_pydantic:
-                schema: false
+            extensions:
+              - griffe_pydantic:
+                  schema: false
 
 markdown_extensions:
   - admonition
@@ -98,6 +124,9 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
