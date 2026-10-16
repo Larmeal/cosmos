@@ -1,55 +1,87 @@
+---
+icon: material/file-chart-outline
+---
+
 # Reporting
 
-Every run writes a report. Pylos is meant to run unattended every day, so the report is what the
-next person or machine reads.
+Every run that reaches a file writes a report. Pylos is meant to run unattended every day, so the
+report is what the next person or machine reads.
 
-## Sinks
+## 📄 What a report is
 
-A sink receives reports. One `Sink` abstraction serves both validation and profile reports, and
-each sink serializes for itself: the file sink writes a JSON document, and a BigQuery sink
-flattens the report to rows.
+A report is one JSON document per run, written by the sink in the
+[`report`](../configuration/report.md) section. Only the local file sink works today. A real report
+is shown in [Getting started](../getting-started/index.md#what-you-get).
 
-The first release ships the JSON file sink. BigQuery follows in a later release.
+The `run_id` is the contract name and the pipeline `id` joined by a hyphen, so every run of the same
+pipeline has the same `run_id`, and the local sink replaces the previous report.
 
-## Identity and retries
+## 🔬 Anatomy
 
-Orchestrators retry, so a rerun must not duplicate rows. Two identifiers handle this, the same
-split Airflow makes between `run_id` and `try_number`:
+The report is a [`PylosResult`][pylos.results.PylosResult]. At the top:
 
-| | Derived from | Used for |
-|---|---|---|
-| `run_id` | `id` plus the caller's `run_key`, deterministic | De-duplication and grouping history |
-| `attempt_id` | Unique per process | Telling which attempt wrote a row |
+| Field | What it holds |
+|---|---|
+| `pylos_version` | The version that wrote the report |
+| `run_id` | `<contract name>-<id>` |
+| `run_ts` | When the run started, in UTC |
+| `results` | One entry per source file |
+| `run_status` | Did Pylos finish its job: `completed`, `partial` or `aborted` |
+| `decision` | Was the data good: `passed`, `warned`, `failed`, or `null` |
 
-`run_key` is the time dimension the caller supplies (Airflow passes `data_interval_start`). Rerun
-with the same `run_key` and you get the same `run_id`, so rows merge onto themselves. If
-idempotency is on and `run_key` is missing, the config fails to load. Guessing a default could
-break de-duplication silently.
+Each entry in `results` is a [`SourceObjectResult`][pylos.results.SourceObjectResult]:
 
-A row is identified by `run_id`, the full URI of the source object, and an expectation key. The
-expectation key has to cover the kwargs as well as the type, since `not_null` can appear on four
-columns in one contract.
+| Field | What it holds |
+|---|---|
+| `status` | `completed` or `aborted` for this file |
+| `source_object` | The file's path, size and timestamps |
+| `row_count`, `column_count` | The shape of the data that was read |
+| `read_duration_sec`, `validation_duration_sec` | How long each step took |
+| `error_type`, `error_message` | Why the file aborted, otherwise `null` |
+| `decision` | `passed`, `warned` or `failed`, and `null` for an aborted file |
+| `expectations` | One entry per rule |
+| `action` | What was done to the file |
 
-## Written twice, so merged
+Each rule is an [`ExpectationResult`][pylos.results.ExpectationResult]. It repeats the rule's name,
+type, kwargs, severity and `expectation_key`, and adds the outcome: `success`, `element_count`,
+`unexpected_count`, `unexpected_percent`, and the first `unexpected_values` with their
+`unexpected_index`.
 
-Each source object's row is written before the file action, with `action_result = PENDING`, and
-written again once the outcome is known. Sinks therefore merge on row identity instead of
-appending. Appending would leave two contradictory rows.
+The `action` is an [`ActionResult`][pylos.results.ActionResult]. Its `status` is one of these:
 
-A row still at `PENDING` means Pylos was about to act and never recorded whether it did. A file
-move and a database write cannot be made atomic, so this window cannot be closed. It can be
-detected, though, by a query for rows stuck at `PENDING` past some age.
+| Status | Meaning |
+|---|---|
+| `completed` | The action ran and succeeded |
+| `skipped` | Nothing needed to touch the file |
+| `failed` | Pylos tried the action and it raised. The decision and the rules are kept |
 
-Two rules protect that evidence:
+See [`ActionStatus`][pylos.results.ActionStatus].
 
-- A merge never deletes rows it did not match. After a crash during a move, the rerun sees one
-  file fewer, and deleting unmatched rows would erase the only record that it failed.
-- An overwrite never reaches beyond the scope being written. A table-wide overwrite would destroy
-  all history.
+## 📤 Sinks
 
-## Run-level verdicts come last
+A sink receives the report. The local file sink writes `<path>/<run_id>.json`. GCS and BigQuery
+sinks are planned, and a config that names them fails at load.
 
-`run_status` and `data_decision` are rollups over every object, so they are unknown while the loop
-is still running. Rows are written with them empty, and a final merge on `run_id` fills them in.
-Rows that still have them empty after a long time belong to a run that started and never
-finished, and they show how far it got.
+## 📅 Planned: write-ahead reports
+
+The design writes the report twice around the file action, so a crash cannot destroy a file without
+leaving a record. This is not in the code yet.
+
+```mermaid
+flowchart LR
+    W("Row written<br/>before the action") --> P("PENDING"):::warned
+    P -->|"action ran"| C("COMPLETED"):::passed
+    P -->|"action failed"| F("FAILED"):::failed
+    N("Nothing to do<br/>for the file") --> S("SKIPPED")
+    classDef failed fill:#e5484d26,stroke:#e5484d,stroke-width:2px
+    classDef warned fill:#f5a52426,stroke:#f5a524,stroke-width:2px
+    classDef passed fill:#30a46c26,stroke:#30a46c,stroke-width:2px
+```
+
+A row still at `PENDING` would mean Pylos was about to act and never recorded whether it did. A file
+move and a database write cannot be made atomic, so that window cannot be closed, only detected.
+
+The same design adds a caller-supplied `run_key`, so a retried run keeps its `run_id`, and an
+`attempt_id` that tells attempts apart. Table sinks would merge on the row's identity instead of
+appending, and a merge would never delete rows it did not match. See
+[Planned keys](../configuration/planned.md).

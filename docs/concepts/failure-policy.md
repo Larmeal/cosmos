@@ -1,73 +1,90 @@
+---
+icon: material/shield-alert-outline
+---
+
 # Failure policy
 
-Great Expectations tells you whether a batch passed. Pylos decides what that means for the file.
+Great Expectations tells you whether a batch passed. Pylos decides what that means for each file
+and what to do about it.
 
-## From severity to action
+## 🚦 From severity to decision
 
-Each expectation in a contract has a severity, and the severity of what failed sets the decision:
+Every expectation in a contract has a [severity](../configuration/validation.md#severity), and the
+worst failing severity sets the file's decision:
+
+```mermaid
+flowchart LR
+    R(["Results for<br/>one file"]) --> C{"A critical<br/>rule failed?"}
+    C -- yes --> F("failed"):::failed --> A("Run the<br/>on_failure action"):::effect
+    C -- no --> W{"A warning<br/>rule failed?"}
+    W -- yes --> WN("warned"):::warned --> L("The file<br/>stays put")
+    W -- no --> PS("passed"):::passed --> L
+    classDef effect fill:#6e56cf26,stroke:#6e56cf,stroke-width:2px
+    classDef failed fill:#e5484d26,stroke:#e5484d,stroke-width:2px
+    classDef warned fill:#f5a52426,stroke:#f5a524,stroke-width:2px
+    classDef passed fill:#30a46c26,stroke:#30a46c,stroke-width:2px
+```
 
 | What failed | Decision | What happens to the file |
 |---|---|---|
-| A `critical` expectation | `FAIL` | The configured `on_failure` action runs (move, copy or delete) |
-| Only `warning` expectations | `WARN` | Left where it is |
-| Nothing, or only `info` | `PASS` | Left where it is |
+| A `critical` expectation | `failed` | The [`on_failure`](../configuration/on-failure.md) action runs |
+| Only `warning` expectations | `warned` | Left where it is |
+| Nothing, or only `info` | `passed` | Left where it is |
 
-Only `FAIL` touches the file. All three outcomes are written to the report.
+Only `failed` touches the file. All three decisions are written to the report. See
+[`Decision`][pylos.results.Decision].
 
-`on_failure` sits beside `validate:` instead of inside it, because it also fires for a file that
-could not be read at all, before any expectation ran.
+## 🚫 A file Pylos could not judge
 
-## Data problems and everything else
+Some files never reach a decision. A corrupt file cannot be parsed, and an empty file has nothing
+to check. These are recorded with `status: aborted`, the error type and its message, and no
+decision.
 
-Pylos has two error classes:
+The run carries on with the next file, so one bad file does not hide the others. What happens to
+the unreadable file itself depends on [`mode`](../configuration/on-failure.md#mode):
 
-```
-PylosError
-├── ConfigurationError   the declaration is wrong   -> abort the run
-└── DataError            the data itself is bad     -> dead-letter this file, continue
-```
+| `mode` | A file Pylos could not read |
+|---|---|
+| `decision` (default) | Left where it is, reported as `aborted` |
+| `any_failure` | The `on_failure` action runs on it |
 
-A corrupt CSV and a network timeout both reach Pylos as an exception from the reader, and they call
-for opposite responses. If both were treated as bad data, a network blip could quarantine ten
-healthy files. The rule is:
+The default keeps a read error from moving a healthy file. A file that is slow to arrive or still
+being written fails to read for a reason that has nothing to do with its data.
 
-> Positively identify a data problem. Treat everything else as fatal.
+An empty file follows [`on_empty`](../configuration/source.md#on_empty). A pattern that matches no
+file at all raises a `FileNotFoundError` before any file is read, and no report is written.
 
-Only `DataError` is caught while Pylos loops over source objects. A timeout, an expired credential
-or a bug in Pylos propagates and stops the run before anything is touched. See
-[`pylos.exceptions`](../reference/exceptions/index.md) for the classes.
+## 🔁 Order of work in a run
 
-## Report first, file action second
+For each file the runner reads, validates, decides, acts and records, then moves on to the next
+file. When every file is done, it rolls the results up and writes one report.
 
-Pylos works through each checkpoint in this order:
-
-1. Read and validate each object.
-2. Decide, per object.
-3. Write the report to every sink. If this fails, stop and leave the files alone.
-4. Perform the file actions.
-5. Record the outcomes back into the report.
-
-With the action first, the report would point at a path that no longer exists. If the report write
-then failed, the data would be gone with no record of why.
-
-## Two status axes
-
-A single value cannot say "11 of 12 files were checked and all 11 passed", so every run carries
-two:
-
-```
-run_status:    completed | partial | aborted     did Pylos do its job?
-data_decision: pass | warn | fail                was the data good?
+```mermaid
+flowchart TB
+    subgraph each["For each file"]
+        direction LR
+        A("Read") --> B("Validate<br/>with GX") --> C("Decide from<br/>severities") --> D("Perform the<br/>action"):::effect --> E("Record the<br/>result")
+    end
+    each --> G("Roll up<br/>the run") --> H("Write the<br/>report")
+    classDef effect fill:#6e56cf26,stroke:#6e56cf,stroke-width:2px
 ```
 
-When one file fails, Pylos records it and carries on with the rest. A partial run on record is
-better than an aborted one that leaves the day missing from the table.
+!!! info "Planned: write the report before acting"
 
-## Empty runs and empty files
+    The design writes the report before the file action. If that write fails, the files stay
+    untouched, and a crash between the two leaves a trail in the report. The code does not do this
+    yet. See [Reporting](reporting.md#planned-write-ahead-reports).
 
-A run that matches no files still writes a report, so "checked, found nothing" looks different from
-"Pylos never ran". Whether that counts as an error is up to the pipeline, through `on_empty`.
+## 🎯 Two verdicts for a run
 
-A file that exists but has zero rows is a separate case. An empty frame passes every column
-expectation, so a day with no data would show up as a clean pass. Pylos reports it explicitly and
-raises the decision from `PASS` to `WARN`.
+One value cannot say "11 of 12 files were checked and all 11 passed", so every run carries two:
+
+| Field | Values | Question it answers |
+|---|---|---|
+| `run_status` | `completed`, `partial`, `aborted` | Did Pylos do its job? |
+| `decision` | `passed`, `warned`, `failed`, or `null` | Was the data good? |
+
+`run_status` is `completed` when every file completed, `aborted` when every file aborted, and
+`partial` in between. `decision` rolls up the decisions of the files that were judged, and is
+`null` when none were. A run with one failed file and one passed file has `decision: failed`. See
+[`RunStatus`][pylos.results.RunStatus] and [`PylosResult.decision`][pylos.results.PylosResult.decision].

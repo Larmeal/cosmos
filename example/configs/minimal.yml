@@ -7,11 +7,11 @@ id: my_dataset
 engine: pandas
 
 source:
-  type: local
+  storage: local
   file_format: csv
   file_path: data/*.csv
 
-validate:
+validation:
   contract:
     name: my_contract
     expectations:
@@ -20,10 +20,11 @@ validate:
           column: id
         severity: critical
 
-  on_failure:
-    action: move
-    dead_letter: output/dead-letters/
+on_failure:
+  action: move
+  dead_letter: output/dead-letters/
 
 report:
-  - type: file
-    path: output/reports/
+  storage: local
+  format: file
+  path: output/reports/

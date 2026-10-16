@@ -1,7 +1,8 @@
 # Pylos configuration: annotated reference
 #
-# Every field is shown here with its allowed values. Fields marked [v0.x] are not
-# available yet; see PROJECT_SUMMARY.md for the roadmap.
+# Every field the code accepts today is shown here with its allowed values.
+# Blocks marked [planned] are part of the design but are not accepted yet: a key
+# Pylos does not know fails when the file loads.
 #
 # For a runnable starting point, copy example/configs/minimal.yml instead.
 
@@ -10,32 +11,35 @@
 # ---------------------------------------------------------------------------
 
 # Stable name for this pipeline. Must survive a file move or an expectation
-# edit, otherwise reporting history fragments. Forms part of run_id.
+# edit, otherwise reporting history fragments. Forms part of run_id, which is
+# "<contract name>-<id>".
 id: customer_daily
 
 # Which engine loads and validates the data.
-engine: pandas                        # pandas | spark [v0.6] | sql [v0.7]
+engine: pandas                        # pandas (spark and sql are planned)
 
 # ---------------------------------------------------------------------------
 # Source: where the data comes from
 # ---------------------------------------------------------------------------
 
 source:
-  storage: local                      # local | gcs [v0.2]
-  file_format: csv                    # csv | parquet
-  file_path: data/test_*.csv          # glob; matches many files, each validated separately
+  storage: local                      # local | gcs [planned: not usable yet]
+  file_format: csv                    # only csv is read today
+  file_path: data/customer_*.csv      # glob; each match is read and validated separately
 
-  # What it means when the glob matches nothing. Pylos cannot tell "no data
-  # today" from "upstream is late", so declare which one this pipeline expects.
-  on_empty: fail                      # fail | skip
+  # What it means when a file has a header but no rows. An empty file passes
+  # every column expectation, so declare whether this pipeline treats one as a
+  # failure. A glob that matches no file at all raises FileNotFoundError and
+  # writes no report, whatever this says.
+  on_empty: skip                      # skip (default) | fail
 
-  # Passed straight to the engine's reader (pd.read_csv, etc.)
+  # Passed straight to the engine's reader (pd.read_csv).
   options:
     delimiter: ","
     encoding: utf-8
 
-# A table source instead of files [v0.7]: note it has no file_path or
-# file_format, and no file actions are available:
+# A table source instead of files [planned]: it has no file_path or file_format,
+# and no file action applies to it.
 #
 # source:
 #   storage: bigquery
@@ -47,15 +51,16 @@ source:
 # Validation
 # ---------------------------------------------------------------------------
 
-validate:
+validation:
 
-  # The contract: which expectations to apply. Written inline here; from [v0.5]
-  # it can instead reference a shared file:
+  # The contract: which expectations to apply, written inline. A shared contract
+  # file is [planned]:
   #
   #   contract: contracts/customer.yml
   #
   contract:
     name: customer
+    description: Rules every daily customer file must satisfy.
 
     expectations:
         # expectation_type is a Great Expectations name, passed through unchanged.
@@ -63,14 +68,15 @@ validate:
       - expectation_type: expect_column_values_to_not_be_null
         kwargs:
           column: id
-        severity: critical            # critical | warning | info
+        severity: critical            # critical (default) | warning | info
 
-        # Optional. Without it a key is derived from the type and kwargs; giving
-        # one makes reports far easier to read.
+        # Optional. A readable name for the rule in the report. Without one it
+        # becomes <contract name>_<expectation_type>, which two rules of the same
+        # type share; expectation_key is what tells them apart.
         name: id_not_null
 
         # Optional documentation, carried through to the report.
-        description: An order without an id cannot be reconciled.
+        description: A customer without an id cannot be reconciled.
         notes: Added after the 2026-03 incident.
         meta:
           owner: data-platform
@@ -83,62 +89,70 @@ validate:
 
       - expectation_type: expect_column_values_to_be_between
         kwargs:
-          column: amount
+          column: age
           min_value: 0
-          max_value: 1000000
+          max_value: 120
         severity: warning             # warning does not trigger the failure action
 
   # An HTML view of the results, rendered by Great Expectations. Off by default:
-  # nothing is written and no directory is created. Pylos's own reports under
-  # `report:` are the source of truth, this is only for humans who want to
-  # browse results.
+  # nothing is written and no directory is created. Pylos's own report under
+  # `report:` is the source of truth; this is only for people who want to browse.
   data_docs:
     enabled: false
-    # store: output/data_docs/
+    # store_path: output/data_docs/   # required when enabled is true
 
 # ---------------------------------------------------------------------------
 # Failure handling: what happens to the source file
 # ---------------------------------------------------------------------------
 
-# A report is ALWAYS written: it is not one of these choices. These control
-# only what happens to the file itself.
+# A report is ALWAYS written; it is not one of these choices. These control only
+# what happens to the file itself.
 #
-# This sits beside `validate:` rather than inside it because it also fires for a
-# file that could not be read at all, before any expectation runs. An
-# infrastructure error (timeout, expired credentials) never triggers any action.
+# This sits beside `validation:` rather than inside it because it can also apply
+# to a file that could not be read at all, before any expectation runs.
 on_failure:
-  action: move                        # ignore | move | copy [v0.3] | delete [v0.3]
-                                      # ignore leaves the file alone; the report is written either way
-  dead_letter: output/dead-letters/
+  action: move                        # ignore (default) | move | copy | delete
+  dead_letter: output/dead-letters/   # required for move and copy, rejected for the others
+
+  # Which outcomes make the action fire.
+  #   decision      only a file judged bad (a critical expectation failed). A file
+  #                 Pylos could not read stays where it is and is reported as aborted.
+  #   any_failure   also a file that could not be read.
+  mode: decision                      # decision (default) | any_failure
 
 # ---------------------------------------------------------------------------
-# Profiling [v0.4]: descriptive statistics recorded over time
+# Reporting: always written
 # ---------------------------------------------------------------------------
 
-profile:
-  enabled: false
-
-  # Profiling is a full scan by nature. Sample on large tables.
-  sample:
-    rows: 100000
-
-# ---------------------------------------------------------------------------
-# Reporting: always written, for both validate and profile
-# ---------------------------------------------------------------------------
-
+# One JSON document per run, at <path>/<run_id>.json. A rerun replaces it.
 report:
-  - type: file
-    path: output/reports/
+  storage: local                      # local | gcs and bigquery [planned: fail at load]
+  format: file                        # file
+  path: output/reports/
 
-  # [v0.3]
-  # One row per expectation, per origin, per run: an append-only time series.
-  # Drift detection is then an ordinary SQL query over this table.
-  - type: bigquery
-    project: my-project
-    dataset: data_quality
-    write_mode: merge                 # append | overwrite | merge
+# ---------------------------------------------------------------------------
+# Planned: the design includes these, the code does not accept them yet
+# ---------------------------------------------------------------------------
 
-    # merge is required rather than optional: the report is written once before
-    # the file action (recording intent) and again afterwards (recording the
-    # outcome). With append that produces two contradictory rows.
-    merge_key: [run_id, origin, expectation_key]
+# Profiling: descriptive statistics recorded over time.
+#
+# profile:
+#   enabled: true
+#   sample:
+#     rows: 100000
+#
+# Runtime behavior, apart from what is checked.
+#
+# runtime:
+#   checkpoint: 1                     # write after each object; -1 writes once at the end
+#   is_continue: false                # skip objects this run already recorded
+#
+# Several reports at once, with a BigQuery table that merges on a key.
+#
+# report:
+#   - type: file
+#     path: output/reports/
+#   - type: bigquery
+#     dataset: data_quality
+#     write_mode: merge               # append | overwrite | merge
+#     merge_key: [run_id, source_object, expectation_key]
