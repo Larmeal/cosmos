@@ -48,7 +48,10 @@ class ExpectationConfig(BaseModel):
     )
     name: str | None = Field(
         default=None,
-        description="An optional name for the expectation. If not provided, a default name will be generated.",
+        description=(
+            "A readable name for the rule, shown in the report. If omitted, the contract fills in "
+            "'<contract name>_<expectation_type>'."
+        ),
     )
     severity: Literal["critical", "warning", "info"] = Field(
         default="critical",
@@ -130,6 +133,22 @@ class ContractConfig(BaseModel):
         self.datasource_name = self.datasource_name or f"{self.data_asset_name}_source"
         self.batch_definition_name = self.batch_definition_name or f"{self.data_asset_name}_batch"
         self.expectation_suite_name = self.expectation_suite_name or f"{self.data_asset_name}_suite"
+        return self
+
+    @model_validator(mode="after")
+    def _name_unnamed_expectations(self) -> Self:
+        """Give every expectation without a ``name`` the default ``<contract name>_<expectation_type>``.
+
+        The report carries each rule's name, so a rule left unnamed would show ``null``
+        there. A name set in the YAML is kept. An empty name counts as unset.
+
+        The default is not unique: two rules of the same type on different columns get
+        the same name. ``expectation_key`` is what tells them apart, so give such rules
+        an explicit ``name`` when you want to read them apart in a report.
+        """
+        for expectation in self.expectations:
+            if not expectation.name:
+                expectation.name = f"{self.data_asset_name}_{expectation.expectation_type}"
         return self
 
 

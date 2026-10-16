@@ -139,7 +139,7 @@ CASES_EMPTY_SOURCE = [
 #       "expectations": [
 #         {
 #           "success": true,
-#           "expectation_name": null,
+#           "expectation_name": "orders_expect_column_values_to_not_be_null",
 #           "expectation_type": "expect_column_values_to_not_be_null",
 #           "expectation_key": "8aa21df4ef85b66523329aa39fa9aa20ff07ff3d64b51157a75fa7250445e9c6",
 #           "expectation_kwargs": {"column": "id"},
